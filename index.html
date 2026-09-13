@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>WorkoutLog</title>
 <meta name="description" content="A lightweight, installable workout logger — log exercises, sets, reps and weight with zero friction.">
 <link rel="manifest" href="manifest.json">
@@ -24,9 +24,12 @@
   body{
     margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     background:var(--bg); color:var(--text); font-size:15px; line-height:1.5;
-    padding-bottom:40px;
+    padding-bottom:calc(40px + env(safe-area-inset-bottom));
+    padding-top:env(safe-area-inset-top);
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
   }
-  #app{max-width:640px; margin:0 auto; padding:16px;}
+  #app{max-width:640px; margin:0 auto; padding:20px 18px;}
   h1{font-size:20px; font-weight:600; margin:0;}
   .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
   .btn{
@@ -177,10 +180,32 @@
   }
   .toast button{background:transparent; border:none; color:#64b5f6; font-weight:bold; cursor:pointer;}
   .routine-card{border:1px dashed var(--border-strong); padding:10px; border-radius:8px; margin-bottom:8px;}
+
+  .fullscreen-panel{
+    position:fixed; inset:0; background:var(--bg); z-index:60; overflow-y:auto;
+    padding: calc(24px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)) 20px;
+  }
+  .profile-header{display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:28px;}
+  .profile-avatar{
+    width:64px; height:64px; border-radius:50%; background:var(--accent-bg); color:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .profile-avatar .icon-svg{width:30px; height:30px;}
+  .profile-name{font-weight:600; font-size:16px;}
+  .profile-option-list{display:flex; flex-direction:column; gap:10px; margin-bottom:26px;}
+  .profile-section{margin-bottom:22px;}
+  .profile-section h3{
+    font-size:12px; color:var(--text-secondary); text-transform:uppercase;
+    letter-spacing:0.04em; margin:0 0 8px; font-weight:600;
+  }
+  .profile-link{color:var(--accent); text-decoration:none; font-size:14px; word-break:break-all;}
+  .profile-link:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
-<div id="app">Loading…</div>
+<div id="app">
+  <div style="text-align:center; padding:40px 0; color:#6b6b68; font-size:14px;">Loading…</div>
+</div>
 
 <script>
 const $ = sel => document.querySelector(sel);
@@ -205,7 +230,7 @@ let state = {
   pickerTag: null,
   editingEntryId: null,
   editingExerciseId: null,
-  editingSet: null, // { entryId, setId, isNew, initialValues: { weight, reps } }
+  editingSet: null,
   newExName: "",
   newExTags: [],
   tagInputQuery: "",
@@ -250,7 +275,7 @@ async function safeSet(key, value){
     localStorage.setItem(STORAGE_PREFIX + key, strVal);
     return true;
   } catch(e){
-    console.warn("localStorage set failed (quota exceeded or unavailable) — data will not persist after reload", e);
+    console.warn("localStorage set failed (quota exceeded or unavailable)", e);
     showToast("Warning: couldn't save — storage may be full", false);
     return false;
   }
@@ -268,6 +293,7 @@ function showToast(msg, allowUndo = true){
 
 const trashIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>`;
 const editIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const personIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg>`;
 
 async function loadAll(){
   state.exercises = (await safeGet('exercises')) || [];
@@ -320,7 +346,6 @@ function focusWeightInput() {
   }, 50);
 }
 
-// Global outside click listener to CANCEL active set edits
 document.addEventListener('pointerdown', async (e) => {
   if (!state.editingSet) return;
   const container = document.querySelector('.set-edit-inline');
@@ -328,10 +353,8 @@ document.addEventListener('pointerdown', async (e) => {
     const entry = state.currentLog.find(item => item.id === state.editingSet.entryId);
     if (entry) {
       if (state.editingSet.isNew) {
-        // Delete newly created set on click outside
         entry.sets = entry.sets.filter(s => s.id !== state.editingSet.setId);
       } else {
-        // Revert set values back to original initial values
         const set = entry.sets.find(s => s.id === state.editingSet.setId);
         if (set && state.editingSet.initialValues) {
           set.weight = state.editingSet.initialValues.weight;
@@ -345,7 +368,6 @@ document.addEventListener('pointerdown', async (e) => {
   }
 });
 
-// ---------- Navigation ----------
 async function changeDate(delta){
   const d = new Date(state.currentDate + "T00:00:00");
   d.setDate(d.getDate()+delta);
@@ -354,7 +376,6 @@ async function changeDate(delta){
   render();
 }
 
-// ---------- Drag and Drop Reordering ----------
 function handleDragStart(e, index) {
   draggedIndex = index;
   dragTargetIndex = index;
@@ -410,7 +431,6 @@ function cleanupDrag() {
   });
 }
 
-// ---------- Modals ----------
 function openPicker(){ 
   state.modal='picker'; 
   state.pickerSearch=""; 
@@ -552,7 +572,6 @@ async function deleteSet(entryId, setId){
   await saveCurrentLog();
 }
 
-// ---------- Presets (Routines) ----------
 function openRoutinesModal(){ state.modal='routines'; render(); }
 function openNewRoutineModal(){
   state.modal='newRoutine';
@@ -638,16 +657,20 @@ async function applyRoutine(routine){
   await saveCurrentLog();
 }
 
-// ---------- Render ----------
 function render(){
   const app = $('#app');
   app.innerHTML = `
+    <input type="file" id="importInput" accept="application/json" style="display:none" onchange="handleImportFile(this.files[0])">
     <div class="top-bar">
       <div class="row">
-        <h1>Exercise Logger</h1>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" style="border:1px solid var(--border-strong); border-radius:50%; width:34px; height:34px; color:var(--text-secondary);" onclick="openProfile()" title="Profile" aria-label="Profile">${personIconSvg}</button>
+          <img src="icons/icon-192.png" alt="" width="26" height="26" style="border-radius:7px; flex-shrink:0;">
+          <h1>WorkoutLog</h1>
+        </div>
         <div style="display:flex; gap:6px;">
           <button class="btn" onclick="openRoutinesModal()">Presets</button>
-          <button class="btn btn-primary" onclick="openPicker()">+ Log exercise</button>
+          <button class="btn btn-primary" onclick="openPicker()">+ Log workout</button>
         </div>
       </div>
       <div class="date-nav">
@@ -657,18 +680,28 @@ function render(){
       </div>
     </div>
     <div id="log-list">${renderLogList()}</div>
-    <div class="footer-actions">
-      <button class="btn" onclick="exportData()">Export Full App Log</button>
-      <button class="btn" onclick="triggerImport()">Import App Log</button>
-      <input type="file" id="importInput" accept="application/json" style="display:none" onchange="handleImportFile(this.files[0])">
-    </div>
     ${renderModal()}
   `;
 }
 
+function openProfile(){ state.modal='profile'; render(); }
+
 function renderLogList(){
+  const isAppEmpty = state.exercises.length===0 && state.routines.length===0 && state.logDates.length===0;
+  if(isAppEmpty){
+    return `
+      <div class="empty">
+        <p style="margin-bottom:16px;">No logs found.</p>
+        <div style="display:flex; flex-direction:column; gap:10px; max-width:260px; margin:0 auto;">
+          <button class="btn btn-primary" style="justify-content:center;" onclick="openPicker()">+ Log workout</button>
+          <button class="btn" style="justify-content:center;" onclick="openRoutinesModal()">Load preset</button>
+          <button class="btn" style="justify-content:center;" onclick="triggerImport()">Import log</button>
+        </div>
+      </div>
+    `;
+  }
   if(state.currentLog.length===0){
-    return `<div class="empty">No exercises logged for this day.<br>Tap "+ Log exercise" or load a Preset.</div>`;
+    return `<div class="empty">No workouts logged for this day.<br>Tap "+ Log workout" or load a Preset.</div>`;
   }
 
   return state.currentLog.map((entry, index) => {
@@ -772,7 +805,34 @@ function renderModal(){
   if(state.modal==='editExercise') return renderNewExerciseModal();
   if(state.modal==='routines') return renderRoutinesModal();
   if(state.modal==='newRoutine') return renderNewRoutineModal();
+  if(state.modal==='profile') return renderProfileModal();
   return '';
+}
+
+function renderProfileModal(){
+  return `
+    <div class="fullscreen-panel">
+      <div class="profile-header">
+        <div class="profile-avatar">${personIconSvg}</div>
+        <div class="profile-name">Me</div>
+      </div>
+      <div class="profile-option-list">
+        <button class="btn" style="width:100%; justify-content:center;" onclick="triggerImport()">Import</button>
+        <button class="btn" style="width:100%; justify-content:center;" onclick="exportData()">Export</button>
+      </div>
+      <div class="profile-section">
+        <h3>About</h3>
+        <p style="font-size:13.5px; color:var(--text-secondary); margin:0;">WorkoutLog — a lightweight, installable workout logger. No sign-up, your data stays on this device.</p>
+      </div>
+      <div class="profile-section">
+        <h3>Source</h3>
+        <a class="profile-link" href="https://github.com/ukswift/workout-log" target="_blank" rel="noopener">github.com/ukswift/workout-log</a>
+      </div>
+      <div class="footer-actions" style="justify-content:center; margin-top:30px;">
+        <button class="btn btn-primary" style="min-width:140px; justify-content:center;" onclick="closeModal()">OK</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderPickerModal(){
