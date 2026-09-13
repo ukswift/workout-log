@@ -1,0 +1,33 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (in case you add build tooling later, e.g. icon generation)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Env / secrets
+.env
+.env.local
+
+# Build output (if you ever add a bundler)
+dist/
+build/
+
+# Logs
+*.log
+
+# Local backup/export files you might drop in the folder while testing
+*.backup.html
+exercise-app-log-*.json

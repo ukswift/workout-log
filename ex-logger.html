@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise Logger</title>
+<style>
+  :root{
+    --bg:#f5f5f4; --card:#ffffff; --border:#e2e2e0; --border-strong:#c9c9c6;
+    --text:#1a1a19; --text-secondary:#6b6b68; --text-muted:#96968f;
+    --accent:#0c447c; --accent-bg:#e6f1fb; --danger:#d32f2f; --danger-bg:#fcebeb;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); font-size:15px; line-height:1.5;
+    padding-bottom:40px;
+  }
+  #app{max-width:640px; margin:0 auto; padding:16px;}
+  h1{font-size:20px; font-weight:600; margin:0;}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .btn{
+    border:1px solid var(--border-strong); background:var(--card); color:var(--text);
+    border-radius:8px; padding:8px 14px; font-size:14px; cursor:pointer; white-space:nowrap;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn:active{opacity:0.7;}
+  .btn-primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .btn-danger{color:var(--danger); border-color:var(--danger-bg);}
+  .btn-sm{padding:6px 12px; font-size:13px; border-radius:6px;}
+  .btn-ghost{border:none; background:transparent; color:var(--accent); padding:4px 6px;}
+  .top-bar{margin-bottom:16px;}
+  .date-nav{display:flex; align-items:center; gap:10px; margin-top:6px; color:var(--text-secondary); font-size:13px;}
+  
+  #log-list { display: flex; flex-direction: column; gap: 10px; }
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:12px 14px; margin-bottom:0; transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .card.dragging-source{
+    opacity: 0.35;
+    background: var(--accent-bg);
+    border: 2px dashed var(--accent);
+  }
+  .card.drag-over-target{
+    border: 2px solid var(--accent);
+  }
+  .card-header{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .header-left{
+    display:flex; align-items:center; gap:8px; flex:1; min-width:0; flex-wrap:wrap;
+  }
+  .drag-handle{
+    cursor:grab; font-size:18px; color:var(--text-muted); user-select:none; padding:0 4px;
+    display:inline-flex; align-items:center; justify-content:center; touch-action:none;
+  }
+  .drag-handle:active{cursor:grabbing;}
+  .ex-name{font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tags-inline{display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center;}
+  .tag{
+    font-size:11px; background:var(--accent-bg); color:var(--accent);
+    padding:1px 7px; border-radius:999px; font-weight:500; white-space:nowrap;
+  }
+  
+  .sets-line{font-size:13px; color:var(--text-secondary); margin-top:8px; line-height:1.8; display:flex; flex-wrap:wrap; align-items:center; gap:4px;}
+  .set-chip{
+    display:inline-block; background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:3px 8px; font-size:12.5px; cursor:pointer;
+  }
+  .set-chip:active{opacity:0.6;}
+  .add-set-icon-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:50%; background:var(--accent-bg);
+    color:var(--accent); border:1px solid var(--accent); font-weight:bold;
+    font-size:16px; cursor:pointer; line-height:1; vertical-align:middle; margin-left:2px;
+  }
+  .add-set-icon-btn:hover{ background:var(--accent); color:#fff; }
+  
+  .set-edit-inline{
+    display:flex; align-items:center; gap:6px; background:var(--accent-bg);
+    border-radius:6px; padding:6px 8px; width:100%; margin:4px 0;
+  }
+  .set-edit-inline input{
+    width:65px; margin-bottom:0; padding:6px 8px; font-size:14px;
+  }
+  .set-edit-inline .lbl{font-size:12px; color:var(--text-secondary);}
+  
+  .icon-btn{
+    border:none; background:transparent; cursor:pointer; padding:6px;
+    display:inline-flex; align-items:center; justify-content:center;
+    border-radius:6px; color:var(--text-muted);
+  }
+  .icon-btn:hover{background:rgba(0,0,0,0.05);}
+  .icon-btn.danger{color:var(--danger);}
+  .icon-btn.danger:hover{background:var(--danger-bg);}
+  .icon-svg {
+    width:16px; height:16px; stroke:currentColor; stroke-width:2; fill:none;
+    stroke-linecap:round; stroke-linejoin:round;
+  }
+
+  .empty{text-align:center; color:var(--text-muted); padding:30px 20px; font-size:14px;}
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex;
+    align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .modal{
+    background:var(--card); width:100%; max-width:640px; border-radius:16px 16px 0 0;
+    padding:20px; max-height:85vh; overflow-y:auto;
+  }
+  @media(min-width:680px){
+    .modal-overlay{align-items:center;}
+    .modal{border-radius:16px; max-width:480px;}
+  }
+  .modal h2{font-size:17px; margin:0 0 14px;}
+  input[type=text], input[type=number]{
+    width:100%; padding:10px 12px; border:1px solid var(--border-strong);
+    border-radius:8px; font-size:15px; background:var(--card); color:var(--text); margin-bottom:10px;
+  }
+  label{font-size:12px; color:var(--text-secondary); display:block; margin-bottom:4px;}
+
+  .tag-field-container{
+    border:1px solid var(--border-strong); border-radius:8px; padding:6px 8px;
+    min-height:46px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+    background:var(--card); margin-bottom:10px;
+  }
+  .tag-field-container input{
+    border:none; outline:none; padding:4px; margin-bottom:0; flex:1; min-width:120px; font-size:14px; background:transparent;
+  }
+  .tag-chip-selected{
+    font-size:12px; background:var(--accent); color:#fff; padding:4px 9px;
+    border-radius:999px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;
+  }
+  .tag-chip-selected .remove{font-size:14px; line-height:1; opacity:0.8;}
+  .tag-chip-avail{
+    font-size:12px; background:var(--bg); border:1px solid var(--border-strong);
+    color:var(--text-secondary); padding:4px 10px; border-radius:999px; cursor:pointer;
+  }
+  .tag-chip-avail:hover{background:var(--accent-bg); color:var(--accent); border-color:var(--accent);}
+
+  .tag-toggle{
+    font-size:12.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--border-strong);
+    background:var(--card); cursor:pointer; color:var(--text-secondary);
+  }
+  .tag-toggle.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .filter-bar{display:flex; flex-wrap:wrap; gap:6px; margin:10px 0;}
+  
+  .list-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 8px; border-bottom:1px solid var(--border); cursor:pointer;
+    border-radius:6px; gap:8px;
+  }
+  .list-item:hover{ background:var(--bg); }
+  .list-item.create-item{
+    color:var(--accent); font-weight:600; background:var(--accent-bg); border-radius:6px; padding:10px 12px; margin-bottom:8px; border-bottom:none;
+  }
+  .list-item:last-child{border-bottom:none;}
+  .item-info{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+  .item-actions{ display:flex; align-items:center; gap:4px; }
+  
+  .footer-actions{display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;}
+  .error{color:var(--danger); font-size:12px; margin:-6px 0 10px;}
+  .toast{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    background:var(--text); color:#fff; padding:8px 16px; border-radius:8px; font-size:13px; z-index:100;
+    display:flex; align-items:center; gap:8px;
+  }
+  .toast button{background:transparent; border:none; color:#64b5f6; font-weight:bold; cursor:pointer;}
+  .routine-card{border:1px dashed var(--border-strong); padding:10px; border-radius:8px; margin-bottom:8px;}
+</style>
+</head>
+<body>
+<div id="app">Loading…</div>
+
+<script>
+const $ = sel => document.querySelector(sel);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmtDate = d => d.toISOString().slice(0,10);
+const displayDate = dstr => {
+  const d = new Date(dstr + "T00:00:00");
+  const today = fmtDate(new Date());
+  if(dstr === today) return "Today — " + d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+};
+
+let state = {
+  exercises: [],   
+  tags: [],         
+  routines: [],     
+  logDates: [],     
+  currentDate: fmtDate(new Date()),
+  currentLog: [],   
+  modal: null,      
+  pickerSearch: "",
+  pickerTag: null,
+  editingEntryId: null,
+  editingExerciseId: null,
+  editingSet: null, // { entryId, setId, isNew, initialValues: { weight, reps } }
+  newExName: "",
+  newExTags: [],
+  tagInputQuery: "",
+  editingRoutineId: null,
+  newRoutineName: "",
+  newRoutineExIds: []
+};
+
+let historyStack = [];
+let draggedIndex = null;
+let dragTargetIndex = null;
+
+function pushHistory() {
+  historyStack.push(JSON.stringify(state.currentLog));
+  if (historyStack.length > 20) historyStack.shift();
+}
+
+function undo() {
+  if (historyStack.length === 0) return;
+  const previous = historyStack.pop();
+  state.currentLog = JSON.parse(previous);
+  saveCurrentLog(false);
+  render();
+  showToast("Undone action", false);
+}
+
+const memStorage = {};
+async function safeGet(key){
+  try{
+    if (window.storage && window.storage.get) {
+      const r = await window.storage.get(key);
+      return r ? JSON.parse(r.value) : null;
+    }
+  }catch(e){ console.warn("storage get fallback", e); }
+  return memStorage[key] ? JSON.parse(memStorage[key]) : null;
+}
+
+async function safeSet(key, value){
+  const strVal = JSON.stringify(value);
+  memStorage[key] = strVal;
+  try{
+    if (window.storage && window.storage.set) {
+      await window.storage.set(key, strVal);
+    }
+    return true;
+  } catch(e){
+    console.warn("Storage API set fallback used", e);
+    return true;
+  }
+}
+
+function showToast(msg, allowUndo = true){
+  const existing = document.querySelector('.toast');
+  if(existing) existing.remove();
+  const t = document.createElement('div');
+  t.className='toast'; 
+  t.innerHTML = `<span>${msg}</span>` + (allowUndo && historyStack.length > 0 ? `<button onclick="undo()">Undo</button>` : '');
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+const trashIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>`;
+const editIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+
+async function loadAll(){
+  state.exercises = (await safeGet('exercises')) || [];
+  state.tags = (await safeGet('tags')) || [];
+  state.routines = (await safeGet('routines')) || [];
+  state.logDates = (await safeGet('logDates')) || [];
+  await loadLogForDate(state.currentDate);
+  render();
+}
+
+async function loadLogForDate(dateStr){
+  state.currentLog = (await safeGet('log:'+dateStr)) || [];
+  historyStack = [];
+}
+
+async function saveCurrentLog(recordHistory = true){
+  const nowIso = new Date().toISOString();
+  state.currentLog.forEach(entry => {
+    entry.updatedAt = nowIso;
+  });
+
+  await safeSet('log:'+state.currentDate, state.currentLog);
+  if(!state.logDates.includes(state.currentDate)){
+    state.logDates.push(state.currentDate);
+    await safeSet('logDates', state.logDates);
+  }
+}
+
+function tagName(id){ const t = state.tags.find(t=>t.id===id); return t ? t.name : ""; }
+
+function getLastUsedSetValues(exerciseId) {
+  const currentEntry = state.currentLog.find(e => e.exerciseId === exerciseId);
+  if (currentEntry && currentEntry.sets.length > 0) {
+    const validSets = currentEntry.sets.filter(s => s.weight !== '' || s.reps !== '');
+    if (validSets.length > 0) {
+      const last = validSets[validSets.length - 1];
+      return { weight: last.weight, reps: last.reps };
+    }
+  }
+  return { weight: '', reps: '' };
+}
+
+function focusWeightInput() {
+  setTimeout(() => {
+    const el = document.querySelector('.weight-input');
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, 50);
+}
+
+// Global outside click listener to CANCEL active set edits
+document.addEventListener('pointerdown', async (e) => {
+  if (!state.editingSet) return;
+  const container = document.querySelector('.set-edit-inline');
+  if (container && !container.contains(e.target) && !e.target.closest('.add-set-icon-btn') && !e.target.closest('.set-chip')) {
+    const entry = state.currentLog.find(item => item.id === state.editingSet.entryId);
+    if (entry) {
+      if (state.editingSet.isNew) {
+        // Delete newly created set on click outside
+        entry.sets = entry.sets.filter(s => s.id !== state.editingSet.setId);
+      } else {
+        // Revert set values back to original initial values
+        const set = entry.sets.find(s => s.id === state.editingSet.setId);
+        if (set && state.editingSet.initialValues) {
+          set.weight = state.editingSet.initialValues.weight;
+          set.reps = state.editingSet.initialValues.reps;
+        }
+      }
+    }
+    state.editingSet = null;
+    await saveCurrentLog();
+    render();
+  }
+});
+
+// ---------- Navigation ----------
+async function changeDate(delta){
+  const d = new Date(state.currentDate + "T00:00:00");
+  d.setDate(d.getDate()+delta);
+  state.currentDate = fmtDate(d);
+  await loadLogForDate(state.currentDate);
+  render();
+}
+
+// ---------- Drag and Drop Reordering ----------
+function handleDragStart(e, index) {
+  draggedIndex = index;
+  dragTargetIndex = index;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', index);
+  const card = e.currentTarget;
+  setTimeout(() => {
+    if (card) card.classList.add('dragging-source');
+  }, 0);
+}
+
+function handleDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (dragTargetIndex !== index) {
+    dragTargetIndex = index;
+    const cards = document.querySelectorAll('#log-list .card');
+    cards.forEach((c, idx) => {
+      if (idx === dragTargetIndex && idx !== draggedIndex) {
+        c.classList.add('drag-over-target');
+      } else {
+        c.classList.remove('drag-over-target');
+      }
+    });
+  }
+}
+
+function handleDrop(e, targetIndex) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (draggedIndex === null || draggedIndex === targetIndex) {
+    cleanupDrag();
+    return;
+  }
+  pushHistory();
+  const movedItem = state.currentLog.splice(draggedIndex, 1)[0];
+  state.currentLog.splice(targetIndex, 0, movedItem);
+  cleanupDrag();
+  render();
+  saveCurrentLog();
+}
+
+function handleDragEnd(e) {
+  cleanupDrag();
+}
+
+function cleanupDrag() {
+  draggedIndex = null;
+  dragTargetIndex = null;
+  const cards = document.querySelectorAll('#log-list .card');
+  cards.forEach(c => {
+    c.classList.remove('dragging-source', 'drag-over-target');
+  });
+}
+
+// ---------- Modals ----------
+function openPicker(){ 
+  state.modal='picker'; 
+  state.pickerSearch=""; 
+  state.pickerTag=null; 
+  render(); 
+  setTimeout(() => {
+    const el = $('#pickerSearchInput');
+    if(el) el.focus();
+  }, 50);
+}
+
+function closeModal(){ 
+  state.modal=null; 
+  state.editingEntryId=null; 
+  state.editingExerciseId=null; 
+  state.editingRoutineId=null;
+  state.newExName=""; 
+  state.newExTags=[]; 
+  state.tagInputQuery="";
+  render(); 
+}
+
+function openCreateFromSearch(initialName){
+  state.modal='newExercise';
+  state.newExName=initialName;
+  state.newExTags=[];
+  state.tagInputQuery="";
+  render();
+  setTimeout(() => {
+    const el = $('#newExNameInput');
+    if(el) el.focus();
+  }, 50);
+}
+
+async function saveNewExercise(){
+  const name = $('#newExNameInput') ? $('#newExNameInput').value.trim() : "";
+  if(!name){ state.formError="Enter a name"; render(); return; }
+  
+  pushHistory();
+  const ex = {id:uid(), name, tagIds:[...state.newExTags]};
+  state.exercises.push(ex);
+  
+  const lastVals = getLastUsedSetValues(ex.id);
+  const newSet = {id:uid(), reps: lastVals.reps, weight: lastVals.weight};
+  const entry = {id:uid(), exerciseId: ex.id, sets:[newSet], updatedAt: new Date().toISOString()};
+  state.currentLog.push(entry);
+  
+  state.formError=null;
+  state.modal=null;
+  state.editingSet = {
+    entryId: entry.id, 
+    setId: newSet.id, 
+    isNew: true, 
+    initialValues: {weight: newSet.weight, reps: newSet.reps}
+  };
+  render();
+  focusWeightInput();
+  await safeSet('exercises', state.exercises);
+  await saveCurrentLog();
+}
+
+function toggleNewExTag(tagId){
+  const i = state.newExTags.indexOf(tagId);
+  if(i>-1) state.newExTags.splice(i,1); else state.newExTags.push(tagId);
+  render();
+}
+
+async function createAndApplyTag(name){
+  name = name.trim();
+  if(!name) return;
+  let tag = state.tags.find(t=>t.name.toLowerCase()===name.toLowerCase());
+  let tagId = tag ? tag.id : null;
+  if(!tagId){
+    tagId = uid();
+    state.tags.push({id: tagId, name});
+    await safeSet('tags', state.tags);
+  }
+  if(!state.newExTags.includes(tagId)){
+    state.newExTags.push(tagId);
+  }
+  state.tagInputQuery = "";
+  render();
+  setTimeout(() => {
+    const el = $('#tagInlineInput');
+    if(el) el.focus();
+  }, 50);
+}
+
+async function addExerciseToLog(exerciseId){
+  pushHistory();
+  let existingEntry = state.currentLog.find(e => e.exerciseId === exerciseId);
+  
+  if (existingEntry) {
+    const lastVals = getLastUsedSetValues(exerciseId);
+    const newSet = {id:uid(), reps: lastVals.reps, weight: lastVals.weight};
+    existingEntry.sets.push(newSet);
+    state.editingSet = {
+      entryId: existingEntry.id, 
+      setId: newSet.id, 
+      isNew: true, 
+      initialValues: {weight: newSet.weight, reps: newSet.reps}
+    };
+  } else {
+    const lastVals = getLastUsedSetValues(exerciseId);
+    const newSet = {id:uid(), reps: lastVals.reps, weight: lastVals.weight};
+    const entry = {id:uid(), exerciseId, sets:[newSet], updatedAt: new Date().toISOString()};
+    state.currentLog.push(entry);
+    state.editingSet = {
+      entryId: entry.id, 
+      setId: newSet.id, 
+      isNew: true, 
+      initialValues: {weight: newSet.weight, reps: newSet.reps}
+    };
+  }
+
+  state.modal=null;
+  render();
+  focusWeightInput();
+  await saveCurrentLog();
+}
+
+async function deleteEntry(entryId){
+  pushHistory();
+  state.currentLog = state.currentLog.filter(e=>e.id!==entryId);
+  render();
+  showToast("Exercise removed");
+  await saveCurrentLog();
+}
+
+async function deleteSet(entryId, setId){
+  pushHistory();
+  const entry = state.currentLog.find(e=>e.id===entryId);
+  entry.sets = entry.sets.filter(s=>s.id!==setId);
+  if(state.editingSet && state.editingSet.entryId===entryId && state.editingSet.setId===setId){
+    state.editingSet = null;
+  }
+  render();
+  showToast("Set deleted");
+  await saveCurrentLog();
+}
+
+// ---------- Presets (Routines) ----------
+function openRoutinesModal(){ state.modal='routines'; render(); }
+function openNewRoutineModal(){
+  state.modal='newRoutine';
+  state.editingRoutineId = null;
+  state.newRoutineName = "";
+  state.newRoutineExIds = [];
+  render();
+}
+
+function openEditRoutineModal(routineId){
+  const r = state.routines.find(x => x.id === routineId);
+  if(!r) return;
+  state.modal = 'newRoutine';
+  state.editingRoutineId = r.id;
+  state.newRoutineName = r.name;
+  state.newRoutineExIds = [...r.exerciseIds];
+  render();
+}
+
+function toggleRoutineEx(id){
+  const inputEl = $('#routineNameInput');
+  if(inputEl) {
+    state.newRoutineName = inputEl.value;
+  }
+  const idx = state.newRoutineExIds.indexOf(id);
+  if(idx > -1) state.newRoutineExIds.splice(idx, 1);
+  else state.newRoutineExIds.push(id);
+  render();
+}
+
+async function saveRoutine(){
+  const nameInput = $('#routineNameInput');
+  const name = nameInput ? nameInput.value.trim() : state.newRoutineName.trim();
+  if(!name) {
+    alert("Please enter a name for the preset bundle.");
+    return;
+  }
+  if(state.newRoutineExIds.length === 0) {
+    alert("Please select at least one exercise for the preset bundle.");
+    return;
+  }
+  
+  if (state.editingRoutineId) {
+    const r = state.routines.find(x => x.id === state.editingRoutineId);
+    if(r) {
+      r.name = name;
+      r.exerciseIds = [...state.newRoutineExIds];
+    }
+    showToast("Preset bundle updated", false);
+  } else {
+    const routine = { id: uid(), name, exerciseIds: [...state.newRoutineExIds] };
+    state.routines.push(routine);
+    showToast("Preset bundle saved", false);
+  }
+
+  await safeSet('routines', state.routines);
+  state.modal = 'routines';
+  state.editingRoutineId = null;
+  render();
+}
+
+async function deleteRoutine(rId){
+  state.routines = state.routines.filter(r => r.id !== rId);
+  await safeSet('routines', state.routines);
+  render();
+}
+
+async function applyRoutine(routine){
+  pushHistory();
+  for(const exId of routine.exerciseIds){
+    let existingEntry = state.currentLog.find(e => e.exerciseId === exId);
+    const lastVals = getLastUsedSetValues(exId);
+    if (existingEntry) {
+      existingEntry.sets.push({id:uid(), reps: lastVals.reps, weight: lastVals.weight});
+    } else {
+      const newSet = {id:uid(), reps: lastVals.reps, weight: lastVals.weight};
+      state.currentLog.push({id:uid(), exerciseId: exId, sets:[newSet], updatedAt: new Date().toISOString()});
+    }
+  }
+  state.modal = null;
+  render();
+  showToast(`Added routine "${routine.name}"`);
+  await saveCurrentLog();
+}
+
+// ---------- Render ----------
+function render(){
+  const app = $('#app');
+  app.innerHTML = `
+    <div class="top-bar">
+      <div class="row">
+        <h1>Exercise Logger</h1>
+        <div style="display:flex; gap:6px;">
+          <button class="btn" onclick="openRoutinesModal()">Presets</button>
+          <button class="btn btn-primary" onclick="openPicker()">+ Log exercise</button>
+        </div>
+      </div>
+      <div class="date-nav">
+        <button class="btn-ghost" onclick="changeDate(-1)">&larr;</button>
+        <span>${displayDate(state.currentDate)}</span>
+        <button class="btn-ghost" onclick="changeDate(1)" ${state.currentDate===fmtDate(new Date())?'style="visibility:hidden"':''}>&rarr;</button>
+      </div>
+    </div>
+    <div id="log-list">${renderLogList()}</div>
+    <div class="footer-actions">
+      <button class="btn" onclick="exportData()">Export Full App Log</button>
+      <button class="btn" onclick="triggerImport()">Import App Log</button>
+      <input type="file" id="importInput" accept="application/json" style="display:none" onchange="handleImportFile(this.files[0])">
+    </div>
+    ${renderModal()}
+  `;
+}
+
+function renderLogList(){
+  if(state.currentLog.length===0){
+    return `<div class="empty">No exercises logged for this day.<br>Tap "+ Log exercise" or load a Preset.</div>`;
+  }
+
+  return state.currentLog.map((entry, index) => {
+    const ex = state.exercises.find(e=>e.id===entry.exerciseId);
+    const name = ex ? ex.name : "(deleted exercise)";
+    const tags = ex && ex.tagIds ? ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('') : '';
+    
+    let setNum = 0;
+    const completedChips = [];
+    let editingHtml = '';
+
+    entry.sets.forEach(s => {
+      const isComplete = s.weight !== '' && s.reps !== '';
+      const isEditing = state.editingSet && state.editingSet.entryId === entry.id && state.editingSet.setId === s.id;
+      
+      if (isEditing) {
+        editingHtml = `
+          <div class="set-edit-inline">
+            <input type="number" class="weight-input" min="0.1" step="any" inputmode="decimal" value="${s.weight}" placeholder="lbs" oninput="updateSetField('${entry.id}','${s.id}','weight', this.value)">
+            <span class="lbl">lbs ×</span>
+            <input type="number" min="1" step="1" inputmode="decimal" value="${s.reps}" placeholder="reps" oninput="updateSetField('${entry.id}','${s.id}','reps', this.value)">
+            <span class="lbl">reps</span>
+            <button class="icon-btn danger" onclick="deleteSet('${entry.id}','${s.id}')" title="Delete set" aria-label="Delete set">${trashIconSvg}</button>
+            <button class="icon-btn" onclick="toggleEditSet('${entry.id}','${s.id}')" title="Done" aria-label="Done">✓</button>
+          </div>`;
+      } else if (isComplete) {
+        setNum++;
+        completedChips.push(`<span class="set-chip" onclick="toggleEditSet('${entry.id}','${s.id}')">Set ${setNum}: ${s.weight}lbs × ${s.reps}reps</span>`);
+      }
+    });
+
+    let setsContent = '';
+    if (completedChips.length === 0 && !editingHtml) {
+      setsContent = `<button class="btn btn-sm" style="width:100%; justify-content:center;" onclick="addSetInline('${entry.id}')">+ Add set</button>`;
+    } else {
+      setsContent = `
+        ${completedChips.join('')}
+        ${editingHtml}
+        <button class="add-set-icon-btn" onclick="addSetInline('${entry.id}')" title="Add set" aria-label="Add set">+</button>
+      `;
+    }
+    
+    return `
+      <div class="card" 
+           draggable="true" 
+           ondragstart="handleDragStart(event, ${index})" 
+           ondragover="handleDragOver(event, ${index})" 
+           ondrop="handleDrop(event, ${index})" 
+           ondragend="handleDragEnd(event)">
+        <div class="card-header">
+          <div class="header-left">
+            <span class="drag-handle" title="Drag to reorder">≡</span>
+            <span class="ex-name">${escapeHtml(name)}</span>
+            ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
+          </div>
+          <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')" title="Delete exercise log" aria-label="Delete exercise log">${trashIconSvg}</button>
+        </div>
+        <div class="sets-line">${setsContent}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleEditSet(entryId, setId){
+  if(state.editingSet && state.editingSet.entryId===entryId && state.editingSet.setId===setId){
+    state.editingSet = null;
+  } else {
+    const entry = state.currentLog.find(e=>e.id===entryId);
+    const set = entry ? entry.sets.find(s=>s.id===setId) : null;
+    state.editingSet = {
+      entryId, 
+      setId, 
+      isNew: false,
+      initialValues: set ? { weight: set.weight, reps: set.reps } : null
+    };
+    focusWeightInput();
+  }
+  render();
+}
+
+async function addSetInline(entryId){
+  pushHistory();
+  const entry = state.currentLog.find(e=>e.id===entryId);
+  const lastVals = getLastUsedSetValues(entry.exerciseId);
+  const newSet = {id:uid(), reps: lastVals.reps, weight: lastVals.weight};
+  entry.sets.push(newSet);
+  state.editingSet = {
+    entryId, 
+    setId: newSet.id, 
+    isNew: true, 
+    initialValues: {weight: newSet.weight, reps: newSet.reps}
+  };
+  render();
+  focusWeightInput();
+  await saveCurrentLog();
+}
+
+function renderModal(){
+  if(state.modal==='picker') return renderPickerModal();
+  if(state.modal==='newExercise') return renderNewExerciseModal();
+  if(state.modal==='editExercise') return renderNewExerciseModal();
+  if(state.modal==='routines') return renderRoutinesModal();
+  if(state.modal==='newRoutine') return renderNewRoutineModal();
+  return '';
+}
+
+function renderPickerModal(){
+  const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+  const query = state.pickerSearch.trim().toLowerCase();
+  
+  const filtered = sorted.filter(ex => {
+    const matchesName = ex.name.toLowerCase().includes(query);
+    const matchesExerciseTag = ex.tagIds && ex.tagIds.some(tid => tagName(tid).toLowerCase().includes(query));
+    const matchesSearch = !query || matchesName || matchesExerciseTag;
+    const matchesFilterTag = !state.pickerTag || (ex.tagIds && ex.tagIds.includes(state.pickerTag));
+    return matchesSearch && matchesFilterTag;
+  });
+  
+  const exactMatch = sorted.some(ex => ex.name.toLowerCase() === query);
+  const tagChips = state.tags.map(t=>`
+    <button class="tag-toggle ${state.pickerTag===t.id?'active':''}" onclick="setPickerTag('${t.id}')">${escapeHtml(t.name)}</button>
+  `).join('');
+  
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h2>Add exercise to log</h2>
+        <input type="text" id="pickerSearchInput" placeholder="Search exercise or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="onPickerSearch(this.value)">
+        <div class="filter-bar">
+          <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
+          ${tagChips}
+        </div>
+        <div>
+          ${query && !exactMatch ? `
+            <div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">
+              + Create "${escapeHtml(state.pickerSearch.trim())}"
+            </div>
+          ` : ''}
+          ${filtered.length ? filtered.map(ex=>`
+            <div class="list-item" onclick="addExerciseToLog('${ex.id}')">
+              <div class="item-info">
+                <span class="ex-name">${escapeHtml(ex.name)}</span>
+                ${ex.tagIds && ex.tagIds.length ? `<span class="tags-inline">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</span>` : ''}
+              </div>
+              <div class="item-actions">
+                <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit exercise" aria-label="Edit exercise">${editIconSvg}</button>
+                <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete exercise" aria-label="Delete exercise">${trashIconSvg}</button>
+              </div>
+            </div>
+          `).join('') : (!query ? `<div class="empty">No exercises found.</div>` : '')}
+        </div>
+        <div class="footer-actions">
+          <button class="btn" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function onPickerSearch(v){ 
+  state.pickerSearch=v; 
+  render(); 
+  setTimeout(()=>{ 
+    const el=$('#pickerSearchInput'); 
+    if(el){el.focus(); el.selectionStart=el.selectionEnd=el.value.length;} 
+  }, 0); 
+}
+
+function setPickerTag(id){ state.pickerTag=id; render(); }
+
+function openEditExercise(exId){
+  const ex = state.exercises.find(e=>e.id===exId);
+  if(!ex) return;
+  state.modal='editExercise';
+  state.editingExerciseId = exId;
+  state.newExName = ex.name;
+  state.newExTags = ex.tagIds ? [...ex.tagIds] : [];
+  state.tagInputQuery = "";
+  render();
+}
+
+async function saveEditExercise(){
+  const name = $('#newExNameInput') ? $('#newExNameInput').value.trim() : "";
+  if(!name){ state.formError="Enter a name"; render(); return; }
+  const ex = state.exercises.find(e=>e.id===state.editingExerciseId);
+  ex.name = name;
+  ex.tagIds = [...state.newExTags];
+  state.formError=null;
+  state.modal='picker';
+  state.editingExerciseId=null;
+  render();
+  showToast("Exercise updated", false);
+  await safeSet('exercises', state.exercises);
+}
+
+async function deleteExercise(exId){
+  state.exercises = state.exercises.filter(e=>e.id!==exId);
+  render();
+  showToast("Exercise deleted", false);
+  await safeSet('exercises', state.exercises);
+}
+
+function renderNewExerciseModal(){
+  const isEdit = state.modal==='editExercise';
+  
+  const selectedChips = state.newExTags.map(tid => `
+    <span class="tag-chip-selected" onclick="toggleNewExTag('${tid}')">
+      #${escapeHtml(tagName(tid))} <span class="remove">&times;</span>
+    </span>
+  `).join('');
+
+  const q = state.tagInputQuery.trim().toLowerCase();
+  const unselectedTags = state.tags.filter(t => !state.newExTags.includes(t.id));
+  const filteredUnselected = unselectedTags.filter(t => !q || t.name.toLowerCase().includes(q));
+  const exactTagMatch = state.tags.some(t => t.name.toLowerCase() === q);
+
+  const availableChips = filteredUnselected.map(t => `
+    <span class="tag-chip-avail" onclick="toggleNewExTag('${t.id}')">
+      + #${escapeHtml(t.name)}
+    </span>
+  `).join('');
+
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h2>${isEdit ? 'Edit exercise' : 'New exercise'}</h2>
+        <label>Name</label>
+        <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
+        ${state.formError ? `<div class="error">${state.formError}</div>` : ''}
+        
+        <label>Tags (type to search or create)</label>
+        <div class="tag-field-container">
+          ${selectedChips}
+          <input type="text" id="tagInlineInput" placeholder="${state.newExTags.length === 0 ? 'Search or add tags...' : 'Add tag...'}" value="${escapeAttr(state.tagInputQuery)}" oninput="onTagInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); if(state.tagInputQuery.trim()) createAndApplyTag(state.tagInputQuery.trim());}">
+        </div>
+        
+        ${q && !exactTagMatch ? `
+          <div style="margin-bottom:8px;">
+            <span class="tag-chip-selected" style="background:var(--accent);" onclick="createAndApplyTag('${escapeAttr(state.tagInputQuery.trim())}')">
+              + Create "#${escapeHtml(state.tagInputQuery.trim())}"
+            </span>
+          </div>
+        ` : ''}
+
+        <div class="tag-available-box">
+          ${availableChips}
+        </div>
+
+        <div class="footer-actions">
+          <button class="btn btn-primary" onclick="${isEdit ? 'saveEditExercise()' : 'saveNewExercise()'}">${isEdit ? 'Save changes' : 'Save exercise'}</button>
+          <button class="btn" onclick="state.modal='picker'; state.editingExerciseId=null; render();">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function onTagInput(v){
+  state.tagInputQuery = v;
+  render();
+  setTimeout(() => {
+    const el = $('#tagInlineInput');
+    if(el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
+  }, 0);
+}
+
+function renderRoutinesModal(){
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h2>Exercise Presets (Bundles)</h2>
+        ${state.routines.length === 0 ? `<div class="empty">No presets created yet (e.g., Push Day, Leg Day).</div>` : ''}
+        ${state.routines.map(r => `
+          <div class="routine-card row">
+            <div>
+              <strong>${escapeHtml(r.name)}</strong>
+              <div style="font-size:12px; color:var(--text-secondary);">
+                ${r.exerciseIds.map(id => {
+                  const ex = state.exercises.find(e => e.id === id);
+                  return ex ? ex.name : '';
+                }).filter(Boolean).join(', ')}
+              </div>
+            </div>
+            <div style="display:flex; gap:4px; align-items:center;">
+              <button class="btn btn-sm btn-primary" onclick="applyRoutine(state.routines.find(x=>x.id==='${r.id}'))">Add Today</button>
+              <button class="icon-btn" onclick="openEditRoutineModal('${r.id}')" title="Edit routine" aria-label="Edit routine">${editIconSvg}</button>
+              <button class="icon-btn danger" onclick="deleteRoutine('${r.id}')" title="Delete routine" aria-label="Delete routine">${trashIconSvg}</button>
+            </div>
+          </div>
+        `).join('')}
+        <div class="footer-actions">
+          <button class="btn btn-primary" onclick="openNewRoutineModal()">+ Create Preset Bundle</button>
+          <button class="btn" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderNewRoutineModal(){
+  const isEdit = Boolean(state.editingRoutineId);
+  const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h2>${isEdit ? 'Edit Exercise Bundle' : 'Create Exercise Bundle'}</h2>
+        <label>Bundle Name</label>
+        <input type="text" id="routineNameInput" placeholder="e.g. Push Day, Leg Day" value="${escapeAttr(state.newRoutineName)}" oninput="state.newRoutineName = this.value">
+        <label>Select Exercises</label>
+        <div style="max-height:200px; overflow-y:auto; margin-bottom:12px;">
+          ${sorted.map(ex => `
+            <div class="list-item" onclick="toggleRoutineEx('${ex.id}')">
+              <span>${escapeHtml(ex.name)}</span>
+              <input type="checkbox" ${state.newRoutineExIds.includes(ex.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleRoutineEx('${ex.id}')">
+            </div>
+          `).join('')}
+        </div>
+        <div class="footer-actions">
+          <button class="btn btn-primary" onclick="saveRoutine()">${isEdit ? 'Save Changes' : 'Save Preset'}</button>
+          <button class="btn" onclick="openRoutinesModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function updateSetField(entryId, setId, field, value){
+  const num = parseFloat(value);
+  const entry = state.currentLog.find(e=>e.id===entryId);
+  if(!entry) return;
+  const set = entry.sets.find(s=>s.id===setId);
+  if(!set) return;
+
+  if (isNaN(num) || num <= 0) {
+    set[field] = '';
+  } else {
+    set[field] = num;
+  }
+  await saveCurrentLog();
+}
+
+async function exportData(){
+  const allLogs = {};
+  for(const d of state.logDates){
+    allLogs[d] = (await safeGet('log:'+d)) || [];
+  }
+  
+  const now = new Date();
+  const pad = num => String(num).padStart(2, '0');
+  
+  const year = now.getFullYear();
+  const month = pad(now.getMonth() + 1);
+  const day = pad(now.getDate());
+  const hours = pad(now.getHours());
+  const minutes = pad(now.getMinutes());
+  const seconds = pad(now.getSeconds());
+  
+  const timestampStr = `${year}-${month}-${day}-${hours}${minutes}${seconds}`;
+  
+  const fullBackupPayload = {
+    exportedAt: now.toISOString(),
+    version: "2.0",
+    exercises: state.exercises,
+    tags: state.tags,
+    routines: state.routines,
+    logDates: state.logDates,
+    logs: allLogs
+  };
+
+  const blob = new Blob([JSON.stringify(fullBackupPayload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; 
+  a.download = `exercise-app-log-${timestampStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("Exported full application log", false);
+}
+
+function triggerImport(){ $('#importInput').click(); }
+
+async function handleImportFile(file){
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data.exercises || !data.tags || !data.logs) throw new Error("bad format");
+    
+    state.exercises = data.exercises || [];
+    state.tags = data.tags || [];
+    state.routines = data.routines || [];
+    state.logDates = data.logDates || Object.keys(data.logs);
+    
+    await safeSet('exercises', state.exercises);
+    await safeSet('tags', state.tags);
+    await safeSet('routines', state.routines);
+    await safeSet('logDates', state.logDates);
+    
+    for(const [date, entries] of Object.entries(data.logs)){
+      await safeSet('log:'+date, entries);
+    }
+    
+    await loadLogForDate(state.currentDate);
+    showToast("Full application restored successfully!", false);
+    render();
+  }catch(e){
+    showToast("Import failed — invalid backup file", false);
+  }
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escapeHtml(s); }
+
+loadAll();
+</script>
+</body>
+</html>
