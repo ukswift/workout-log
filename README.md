@@ -1,2 +1,42 @@
-# workout-log
+# WorkoutLog
+
 A lightweight, installable workout logger PWA — log exercises, sets, reps and weight with zero friction. No sign-up, works offline, your data stays on your device.
+
+## Features
+- Add exercises, tag them, and log sets (weight × reps) with minimal taps
+- Reusable exercise bundles/presets (e.g. "Push day", "Leg day")
+- Drag-to-reorder today's exercises
+- Multi-level undo
+- Works offline once installed; installable to your phone's home screen
+- Export/import your full log as JSON for backup or moving between devices
+
+## Deploying to GitHub Pages
+
+1. Create a new GitHub repo named `workout-log` (public).
+2. Add all the files in this folder to the repo root:
+   - `index.html`
+   - `manifest.json`
+   - `sw.js`
+   - `icons/` (icon-192.png, icon-512.png, icon-maskable-512.png, favicon-32.png)
+   - `README.md`, `LICENSE`, `.gitignore`
+3. Commit and push to the `main` branch.
+4. In the repo settings, go to **Settings → Pages**.
+5. Under **Build and deployment**, set **Source** to "Deploy from a branch", branch `main`, folder `/ (root)`.
+6. Save. GitHub will give you a URL like `https://<your-username>.github.io/workout-log/`.
+7. Open that URL on your phone's browser, then use **"Add to Home Screen"** (iOS Safari) or the **Install** prompt (Android Chrome).
+
+## Data & privacy
+
+All data is stored locally in your browser (`localStorage`), scoped to this app's origin. Nothing is sent to a server — each device/browser has its own independent copy. Use the **Export JSON** button to back up your data or move it to another device, and **Import JSON** to restore it.
+
+## Local development
+
+No build step required — it's plain HTML/CSS/JS. Just open `index.html` in a browser, or serve the folder with any static file server for full PWA behavior (service workers require `http(s)://`, not `file://`):
+
+```bash
+npx serve .
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
