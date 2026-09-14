@@ -374,7 +374,6 @@ function getLastUsedSetValues(exerciseId) {
   return { weight: '', reps: '' };
 }
 
-/* Synchronous focus to reliably bring up mobile touch keyboard */
 function focusWeightInput() {
   requestAnimationFrame(() => {
     const el = document.querySelector('.weight-input');
@@ -1041,11 +1040,6 @@ function renderNewExerciseModal(){
 
 function onTagInput(v){
   state.tagInputQuery = v;
-  render();
-  requestAnimationFrame(() => {
-    const el = $('#tagInlineInput');
-    if(el) { el.focus(); el.selectionStart = el.selectionEnd = el.value.length; }
-  });
 }
 
 function renderRoutinesModal(){
@@ -1206,5 +1200,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
+
 </body>
 </html>
