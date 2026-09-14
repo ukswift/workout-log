@@ -10,6 +10,46 @@ A lightweight, installable workout logger PWA — log exercises, sets, reps and 
 - Works offline once installed; installable to your phone's home screen
 - Export/import your full log as JSON for backup or moving between devices
 
+## 🚀 Planned Features & Improvements
+
+### Core Features
+- [ ] **Timezone Selection** — Allow users to select their preferred timezone instead of using device timezone
+- [ ] **Rest Timer** — Add a timer between sets to track recovery time
+- [ ] **Exercise Notes** — Add notes/comments to individual sets (e.g., "felt easy", "form was off")
+- [ ] **Weight Unit Selection** — Support lbs, kg, and other weight units with automatic conversion
+- [ ] **Rep Range Goals** — Set target rep ranges and notify when achieved
+
+### Analytics & History
+- [ ] **Progress Charts** — Visualize weight/rep progression over time for each exercise
+- [ ] **Workout Stats** — Show total volume, avg reps, max weight per exercise
+- [ ] **Workout History Timeline** — Browse past workouts by date with filtering
+- [ ] **Personal Records** — Track and highlight personal bests
+
+### User Experience
+- [ ] **Undo/Redo** — Full undo/redo stack (currently limited to 20 actions)
+- [ ] **Dark Mode** — Support system dark mode preference
+- [ ] **Custom Themes** — Allow users to customize accent colors
+- [ ] **Keyboard Shortcuts** — Add CMD/CTRL shortcuts for power users
+- [ ] **Voice Input** — Log exercises via voice commands
+
+### Data & Sync
+- [ ] **Cloud Sync** — Optional sync across devices (Firebase/Supabase)
+- [ ] **Backup Scheduling** — Auto-backup to cloud storage
+- [ ] **Import from Other Apps** — Support importing from Strong, JEFIT, etc.
+- [ ] **CSV Export** — Export workouts as CSV for spreadsheet analysis
+
+### Social & Sharing
+- [ ] **Workout Sharing** — Share completed workouts with friends
+- [ ] **Progress Photos** — Attach photos to workout logs
+- [ ] **Leaderboards** — Optional friendly competition with other users
+
+### Technical Improvements
+- [ ] **PWA Installation** — Improve install experience on all platforms
+- [ ] **Offline Sync Queue** — Queue actions when offline, sync when online
+- [ ] **Performance** — Optimize rendering for 100+ exercises
+- [ ] **Accessibility** — Improve WCAG compliance
+- [ ] **Unit Tests** — Add comprehensive test suite
+
 ## Deploying to GitHub Pages
 
 1. Create a new GitHub repo named `workout-log` (public).

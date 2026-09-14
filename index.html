@@ -29,7 +29,6 @@
   html, body {
     height: 100%;
     overflow-x: hidden;
-    position: fixed;
     width: 100%;
   }
   body{
@@ -144,18 +143,65 @@
   }
   .modal{
     background:var(--card); width:100%; height:100%; max-width:100%;
-    border-radius:0; 
-    padding: calc(16px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)) 20px;
-    overflow-y:auto; display:flex; flex-direction:column;
+    border-radius:0;
+    padding:0;
+    overflow: hidden; display:flex; flex-direction:column;
+  }
+  .modal h2, .modal label, .modal input[type=text], .modal .filter-bar, .modal .tag-field-container, .modal .tag-create-suggestion {
+    flex-shrink: 0;
+  }
+  .modal h2 {
+    padding: calc(16px + env(safe-area-inset-top)) 20px 16px 20px;
+    margin: 0;
+  }
+  .modal input[type=text] {
+    margin: 0 20px 12px 20px;
+  }
+  .modal label {
+    margin: 0 20px 6px 20px;
+  }
+  .modal .filter-bar {
+    padding: 0 20px 12px 20px;
+  }
+  .modal .tag-field-container {
+    margin: 0 20px 12px 20px;
+  }
+  .modal .tag-create-suggestion {
+    padding: 0 20px 8px 20px;
+  }
+  .modal .picker-list-container, .modal .tag-available-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 20px;
+  }
+  .modal .footer-actions {
+    flex-shrink: 0;
+    background: var(--card);
+    padding: 16px 20px calc(20px + env(safe-area-inset-bottom)) 20px;
+    border-top: 1px solid var(--border);
   }
   @media(min-width:680px){
     .modal-overlay{align-items:center; padding-top:0;}
-    .modal{border-radius:16px; max-width:500px; height:auto; max-height:85vh; padding:24px;}
+    .modal{border-radius:16px; max-width:500px; height:auto; max-height:85vh; padding:0;}
+    .modal h2, .modal label, .modal input[type=text], .modal .filter-bar, .modal .tag-field-container {
+      margin-left: 24px;
+      margin-right: 24px;
+    }
+    .modal h2 {
+      padding: 24px 24px 16px 24px;
+    }
+    .modal .picker-list-container, .modal .tag-available-box {
+      padding: 0 24px;
+    }
+    .modal .footer-actions {
+      padding: 16px 24px;
+    }
   }
   .modal h2{font-size:20px; margin:0 0 16px;}
   input[type=text], input[type=number]{
     width:100%; padding:14px; border:1px solid var(--border-strong);
-    border-radius:10px; font-size:17px; background:var(--card); color:var(--text); margin-bottom:12px;
+    border-radius:10px; font-size:16px; background:var(--card); color:var(--text); margin-bottom:12px;
+    user-select: text;
   }
   label{font-size:14px; font-weight:500; color:var(--text-secondary); display:block; margin-bottom:6px;}
 
@@ -165,7 +211,7 @@
     background:var(--card); margin-bottom:12px;
   }
   .tag-field-container input{
-    border:none; outline:none; padding:4px; margin-bottom:0; flex:1; min-width:120px; font-size:16px; background:transparent;
+    border:none; outline:none; padding:4px; margin-bottom:0; flex:1; min-width:80px; font-size:16px; background:transparent;
   }
   .tag-chip-selected{
     font-size:13px; background:var(--accent); color:#fff; padding:5px 10px;
@@ -241,7 +287,14 @@
 <script>
 const $ = sel => document.querySelector(sel);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
-const fmtDate = d => d.toISOString().slice(0,10);
+
+function fmtDate(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 const displayDate = dstr => {
   const d = new Date(dstr + "T00:00:00");
   const today = fmtDate(new Date());
@@ -498,8 +551,10 @@ function openCreateFromSearch(initialName){
   state.newExName=initialName;
   state.newExTags=[];
   state.tagInputQuery="";
+  state.formError=null;
   render();
   requestAnimationFrame(() => {
+    renderTagOptions();
     const el = $('#newExNameInput');
     if(el) el.focus();
   });
@@ -888,68 +943,79 @@ function renderProfileModal(){
 }
 
 function renderPickerModal(){
-  const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
-  const query = state.pickerSearch.trim().toLowerCase();
-  
-  const filtered = sorted.filter(ex => {
-    const matchesName = ex.name.toLowerCase().includes(query);
-    const matchesExerciseTag = ex.tagIds && ex.tagIds.some(tid => tagName(tid).toLowerCase().includes(query));
-    const matchesSearch = !query || matchesName || matchesExerciseTag;
-    const matchesFilterTag = !state.pickerTag || (ex.tagIds && ex.tagIds.includes(state.pickerTag));
-    return matchesSearch && matchesFilterTag;
-  });
-  
-  const exactMatch = sorted.some(ex => ex.name.toLowerCase() === query);
   const tagChips = state.tags.map(t=>`
     <button class="tag-toggle ${state.pickerTag===t.id?'active':''}" onclick="setPickerTag('${t.id}')">${escapeHtml(t.name)}</button>
   `).join('');
-  
-  return `
+
+  const html = `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h2>Add exercise to log</h2>
-        <input type="text" id="pickerSearchInput" placeholder="Search exercise or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="onPickerSearch(this.value)">
+        <input type="text" id="pickerSearchInput" placeholder="Search exercise or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="state.pickerSearch=this.value; renderPickerList();">
         <div class="filter-bar">
           <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
           ${tagChips}
         </div>
-        <div style="flex:1; overflow-y:auto;">
-          ${query && !exactMatch ? `
-            <div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">
-              + Create "${escapeHtml(state.pickerSearch.trim())}"
-            </div>
-          ` : ''}
-          ${filtered.length ? filtered.map(ex=>`
-            <div class="list-item" onclick="addExerciseToLog('${ex.id}')">
-              <div class="item-info">
-                <span class="ex-name">${escapeHtml(ex.name)}</span>
-                ${ex.tagIds && ex.tagIds.length ? `<span class="tags-inline">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</span>` : ''}
-              </div>
-              <div class="item-actions">
-                <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit exercise" aria-label="Edit exercise">${editIconSvg}</button>
-                <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete exercise" aria-label="Delete exercise">${trashIconSvg}</button>
-              </div>
-            </div>
-          `).join('') : (!query ? `<div class="empty">No exercises found.</div>` : '')}
-        </div>
+        <div style="flex:1; overflow-y:auto;" class="picker-list-container"></div>
         <div class="footer-actions">
           <button class="btn" style="width:100%;" onclick="closeModal()">Close</button>
         </div>
       </div>
     </div>
   `;
+
+  setTimeout(() => renderPickerList(), 0);
+  return html;
 }
 
-function onPickerSearch(v){ 
-  state.pickerSearch=v; 
-  render(); 
-  requestAnimationFrame(()=>{ 
-    const el=$('#pickerSearchInput'); 
-    if(el){el.focus(); el.selectionStart=el.selectionEnd=el.value.length;} 
-  }); 
+function renderPickerList(){
+  requestAnimationFrame(() => {
+    const listContainer = document.querySelector('.picker-list-container');
+    if (!listContainer) return;
+
+    const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+    const query = state.pickerSearch.trim().toLowerCase();
+
+    const filtered = sorted.filter(ex => {
+      const matchesName = ex.name.toLowerCase().includes(query);
+      const matchesExerciseTag = ex.tagIds && ex.tagIds.some(tid => tagName(tid).toLowerCase().includes(query));
+      const matchesSearch = !query || matchesName || matchesExerciseTag;
+      const matchesFilterTag = !state.pickerTag || (ex.tagIds && ex.tagIds.includes(state.pickerTag));
+      return matchesSearch && matchesFilterTag;
+    });
+
+    const exactMatch = sorted.some(ex => ex.name.toLowerCase() === query);
+
+    let html = '';
+    if (query && !exactMatch) {
+      html += `<div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
+    }
+
+    if (filtered.length) {
+      html += filtered.map(ex=>`
+        <div class="list-item" onclick="addExerciseToLog('${ex.id}')">
+          <div class="item-info">
+            <span class="ex-name">${escapeHtml(ex.name)}</span>
+            ${ex.tagIds && ex.tagIds.length ? `<span class="tags-inline">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</span>` : ''}
+          </div>
+          <div class="item-actions">
+            <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit exercise" aria-label="Edit exercise">${editIconSvg}</button>
+            <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete exercise" aria-label="Delete exercise">${trashIconSvg}</button>
+          </div>
+        </div>
+      `).join('');
+    } else if (!query) {
+      html = `<div class="empty">No exercises found.</div>`;
+    }
+
+    listContainer.innerHTML = html;
+  });
 }
 
-function setPickerTag(id){ state.pickerTag=id; render(); }
+function setPickerTag(id){
+  state.pickerTag=id;
+  renderPickerList();
+}
 
 function openEditExercise(exId){
   const ex = state.exercises.find(e=>e.id===exId);
@@ -985,13 +1051,44 @@ async function deleteExercise(exId){
 
 function renderNewExerciseModal(){
   const isEdit = state.modal==='editExercise';
-  
+
   const selectedChips = state.newExTags.map(tid => `
     <span class="tag-chip-selected" onclick="toggleNewExTag('${tid}')">
       #${escapeHtml(tagName(tid))} <span class="remove">&times;</span>
     </span>
   `).join('');
 
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h2>${isEdit ? 'Edit exercise' : 'New exercise'}</h2>
+        <label>Name</label>
+        <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
+        ${state.formError ? `<div class="error">${state.formError}</div>` : ''}
+        
+        <label>Tags (type to search or create)</label>
+        <div class="tag-field-container">
+          ${selectedChips}
+          <input type="text" id="tagInlineInput" placeholder="${state.newExTags.length === 0 ? 'Search or add tags...' : 'Add tag...'}" value="${escapeAttr(state.tagInputQuery)}" oninput="state.tagInputQuery=this.value; renderTagOptions();" onkeydown="if(event.key==='Enter'){event.preventDefault(); if(state.tagInputQuery.trim()) createAndApplyTag(state.tagInputQuery.trim());}">
+        </div>
+        
+        <div class="tag-create-suggestion" style="margin-bottom:8px; display:none;"></div>
+
+        <div class="tag-available-box" style="flex:1; overflow-y:auto;"></div>
+
+        <div class="footer-actions">
+          <button class="btn btn-primary" style="flex:1;" onclick="${isEdit ? 'saveEditExercise()' : 'saveNewExercise()'}">${isEdit ? 'Save changes' : 'Save exercise'}</button>
+          <button class="btn" onclick="state.modal='picker'; state.editingExerciseId=null; render();">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => renderTagOptions(), 0);
+  return html;
+}
+
+function renderTagOptions(){
   const q = state.tagInputQuery.trim().toLowerCase();
   const unselectedTags = state.tags.filter(t => !state.newExTags.includes(t.id));
   const filteredUnselected = unselectedTags.filter(t => !q || t.name.toLowerCase().includes(q));
@@ -1003,43 +1100,24 @@ function renderNewExerciseModal(){
     </span>
   `).join('');
 
-  return `
-    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
-      <div class="modal">
-        <h2>${isEdit ? 'Edit exercise' : 'New exercise'}</h2>
-        <label>Name</label>
-        <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
-        ${state.formError ? `<div class="error">${state.formError}</div>` : ''}
-        
-        <label>Tags (type to search or create)</label>
-        <div class="tag-field-container">
-          ${selectedChips}
-          <input type="text" id="tagInlineInput" placeholder="${state.newExTags.length === 0 ? 'Search or add tags...' : 'Add tag...'}" value="${escapeAttr(state.tagInputQuery)}" oninput="onTagInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault(); if(state.tagInputQuery.trim()) createAndApplyTag(state.tagInputQuery.trim());}">
-        </div>
-        
-        ${q && !exactTagMatch ? `
-          <div style="margin-bottom:8px;">
-            <span class="tag-chip-selected" style="background:var(--accent);" onclick="createAndApplyTag('${escapeAttr(state.tagInputQuery.trim())}')">
-              + Create "#${escapeHtml(state.tagInputQuery.trim())}"
-            </span>
-          </div>
-        ` : ''}
+  const tagBox = document.querySelector('.tag-available-box');
+  if (tagBox) {
+    tagBox.innerHTML = availableChips;
+  }
 
-        <div class="tag-available-box" style="flex:1; overflow-y:auto;">
-          ${availableChips}
-        </div>
-
-        <div class="footer-actions">
-          <button class="btn btn-primary" style="flex:1;" onclick="${isEdit ? 'saveEditExercise()' : 'saveNewExercise()'}">${isEdit ? 'Save changes' : 'Save exercise'}</button>
-          <button class="btn" onclick="state.modal='picker'; state.editingExerciseId=null; render();">Cancel</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function onTagInput(v){
-  state.tagInputQuery = v;
+  const createTagDiv = document.querySelector('.tag-create-suggestion');
+  if (createTagDiv) {
+    if (q && !exactTagMatch) {
+      createTagDiv.innerHTML = `
+        <span class="tag-chip-selected" style="background:var(--accent);" onclick="createAndApplyTag('${escapeAttr(state.tagInputQuery.trim())}')">
+          + Create "#${escapeHtml(state.tagInputQuery.trim())}"
+        </span>
+      `;
+      createTagDiv.style.display = 'block';
+    } else {
+      createTagDiv.style.display = 'none';
+    }
+  }
 }
 
 function renderRoutinesModal(){
