@@ -678,7 +678,7 @@ async function saveNewExercise(){
   if(!name){ state.formError="Enter a name"; render(); return; }
 
   if (isExerciseNameExists(name)) {
-    state.formError=`Exercise "${name}" already exists`;
+    state.formError=`Workout "${name}" already exists`;
     render();
     return;
   }
@@ -771,7 +771,7 @@ async function deleteEntry(entryId){
   pushHistory();
   state.currentLog = state.currentLog.filter(e=>e.id!==entryId);
   render();
-  showToast("Exercise removed");
+  showToast("Workout removed");
   await saveCurrentLog();
 }
 
@@ -935,7 +935,7 @@ async function saveRoutine(){
     return;
   }
   if(state.newRoutineExIds.length === 0) {
-    alert("Please select at least one exercise for the preset bundle.");
+    alert("Please select at least one workout for the preset bundle.");
     return;
   }
   
@@ -1040,7 +1040,7 @@ function renderLogListContent(){
 
   let cardsHtml = state.currentLog.map((entry, index) => {
     const ex = state.exercises.find(e=>e.id===entry.exerciseId);
-    const name = ex ? ex.name : "(deleted exercise)";
+    const name = ex ? ex.name : "(deleted workout)";
     const tags = ex && ex.tagIds ? ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('') : '';
 
     let setNum = 0;
@@ -1091,7 +1091,7 @@ function renderLogListContent(){
             <span class="ex-name">${escapeHtml(name)}</span>
             ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
           </div>
-          <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')" title="Delete exercise log" aria-label="Delete exercise log">${trashIconSvg}</button>
+          <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')" title="Delete workout log" aria-label="Delete workout log">${trashIconSvg}</button>
         </div>
         <div class="sets-line">${setsContent}</div>
       </div>
@@ -1210,8 +1210,8 @@ function renderPickerModal(){
   const html = `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>Add exercise to log</h2>
-        <input type="text" id="pickerSearchInput" placeholder="Search exercise or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="state.pickerSearch=this.value; renderPickerList();">
+        <h2>Add workout to log</h2>
+        <input type="text" id="pickerSearchInput" placeholder="Search workout or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="state.pickerSearch=this.value; renderPickerList();">
         <div class="filter-bar">
           <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
           ${tagChips}
@@ -1256,8 +1256,8 @@ function renderPickerList(){
             ${ex.tagIds && ex.tagIds.length ? `<div class="tags-scrollable" style="max-width:100%; width:100%;">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</div>` : ''}
           </div>
           <div class="item-actions" style="flex-shrink:0; margin-left:auto;">
-            <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit exercise" aria-label="Edit exercise">${editIconSvg}</button>
-            <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete exercise" aria-label="Delete exercise">${trashIconSvg}</button>
+            <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit workout" aria-label="Edit workout">${editIconSvg}</button>
+            <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete workout" aria-label="Delete workout">${trashIconSvg}</button>
           </div>
         </div>
       `).join('');
@@ -1275,7 +1275,7 @@ function renderPickerList(){
 
 function setPickerTag(id){
   state.pickerTag=id;
-  renderPickerList();
+  render();
 }
 
 function openEditExercise(exId){
@@ -1299,7 +1299,7 @@ async function saveEditExercise(){
     ex.name.trim().toLowerCase() === normalizedName
   );
   if (isDuplicate) {
-    state.formError=`Exercise "${name}" already exists`;
+    state.formError=`Workout "${name}" already exists`;
     render();
     return;
   }
@@ -1311,14 +1311,14 @@ async function saveEditExercise(){
   state.modal='picker';
   state.editingExerciseId=null;
   render();
-  showToast("Exercise updated", false);
+  showToast("Workout updated", false);
   await safeSet('exercises', state.exercises);
 }
 
 async function deleteExercise(exId){
   state.exercises = state.exercises.filter(e=>e.id!==exId);
   render();
-  showToast("Exercise deleted", false);
+  showToast("Workout deleted", false);
   await safeSet('exercises', state.exercises);
 }
 
@@ -1334,7 +1334,7 @@ function renderNewExerciseModal(){
   const html = `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>${isEdit ? 'Edit exercise' : 'New exercise'}</h2>
+        <h2>${isEdit ? 'Edit workout' : 'New workout'}</h2>
         <label>Name</label>
         <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
         ${state.formError ? `<div class="error">${state.formError}</div>` : ''}
@@ -1350,7 +1350,7 @@ function renderNewExerciseModal(){
         <div class="tag-available-box" style="flex:1; overflow-y:auto;"></div>
 
         <div class="footer-actions">
-          <button class="btn btn-primary" style="flex:1;" onclick="${isEdit ? 'saveEditExercise()' : 'saveNewExercise()'}">${isEdit ? 'Save changes' : 'Save exercise'}</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="${isEdit ? 'saveEditExercise()' : 'saveNewExercise()'}">${isEdit ? 'Save changes' : 'Save workout'}</button>
           <button class="btn" onclick="state.modal='picker'; state.editingExerciseId=null; render();">Cancel</button>
         </div>
       </div>
@@ -1397,7 +1397,7 @@ function renderRoutinesModal(){
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>Exercise Presets (Bundles)</h2>
+        <h2>Workout Presets (Bundles)</h2>
         <div style="flex:1; overflow-y:auto;">
           ${state.routines.length === 0 ? `<div class="empty">No presets created yet (e.g., Push Day, Leg Day).</div>` : ''}
           ${state.routines.map(r => `
@@ -1434,7 +1434,7 @@ function renderNewRoutineModal(){
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>${isEdit ? 'Edit Exercise Bundle' : 'Create Exercise Bundle'}</h2>
+        <h2>${isEdit ? 'Edit Workout Bundle' : 'Create Workout Bundle'}</h2>
         <label>Bundle Name</label>
         <input type="text" id="routineNameInput" placeholder="e.g. Push Day, Leg Day" value="${escapeAttr(state.newRoutineName)}" oninput="state.newRoutineName = this.value">
         <label>Select Exercises</label>
@@ -1502,7 +1502,7 @@ async function exportData(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; 
-  a.download = `exercise-app-log-${timestampStr}.json`;
+  a.download = `workout-app-log-${timestampStr}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast("Exported full application log", false);
