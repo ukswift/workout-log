@@ -162,6 +162,7 @@
     border-radius:0;
     padding:0;
     overflow: hidden; display:flex; flex-direction:column;
+    box-sizing: border-box;
   }
   .modal h2, .modal label, .modal input[type=text], .modal .filter-bar, .modal .tag-field-container, .modal .tag-create-suggestion {
     flex-shrink: 0;
@@ -172,6 +173,7 @@
   }
   .modal input[type=text] {
     margin: 0 20px 12px 20px;
+    width: calc(100% - 40px);
   }
   .modal label {
     margin: 0 20px 6px 20px;
@@ -180,7 +182,10 @@
     padding: 0 20px 12px 20px;
   }
   .modal .tag-field-container {
-    margin: 0 20px 12px 20px;
+    margin: 0;
+    margin-bottom: 12px;
+    margin-left: 20px;
+    margin-right: 20px;
   }
   .modal .tag-create-suggestion {
     padding: 0 20px 8px 20px;
@@ -218,16 +223,18 @@
     width:100%; padding:14px; border:1px solid var(--border-strong);
     border-radius:10px; font-size:16px; background:var(--card); color:var(--text); margin-bottom:12px;
     user-select: text;
+    box-sizing: border-box;
   }
   label{font-size:14px; font-weight:500; color:var(--text-secondary); display:block; margin-bottom:6px;}
 
   .tag-field-container{
     border:1px solid var(--border-strong); border-radius:10px; padding:8px 10px;
     min-height:50px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-    background:var(--card); margin-bottom:12px;
+    background:var(--card);
+    box-sizing: border-box;
   }
   .tag-field-container input{
-    border:none; outline:none; padding:4px; margin-bottom:0; flex:1; min-width:80px; font-size:16px; background:transparent;
+    border:none; outline:none; padding:4px; margin-bottom:0; flex:1; min-width:50px; font-size:16px; background:transparent;
   }
   .tag-chip-selected{
     font-size:13px; background:var(--accent); color:#fff; padding:5px 10px;
