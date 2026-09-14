@@ -102,9 +102,31 @@
   .drag-handle:active{cursor:grabbing;}
   .ex-name{font-weight:600; font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .tags-inline{display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center;}
+  .tags-scrollable{
+    display:flex;
+    gap:4px;
+    align-items:center;
+    overflow-x:auto;
+    overflow-y:hidden;
+    flex-wrap:nowrap;
+    scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:2px;
+  }
+  .tags-scrollable::-webkit-scrollbar {
+    height: 3px;
+  }
+  .tags-scrollable::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .tags-scrollable::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 2px;
+  }
   .tag{
     font-size:12px; background:var(--accent-bg); color:var(--accent);
     padding:2px 8px; border-radius:999px; font-weight:500; white-space:nowrap;
+    flex-shrink:0;
   }
   
   .sets-line{font-size:14px; color:var(--text-secondary); margin-top:10px; line-height:1.8; display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
@@ -1111,21 +1133,18 @@ function renderPickerList(){
       return matchesSearch && matchesFilterTag;
     });
 
-    const exactMatch = sorted.some(ex => ex.name.toLowerCase() === query);
+    const exactMatch = sorted.some(ex => ex.name.trim().toLowerCase() === query);
 
     let html = '';
-    if (query && !exactMatch) {
-      html += `<div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
-    }
 
     if (filtered.length) {
       html += filtered.map(ex=>`
         <div class="list-item" onclick="addExerciseToLog('${ex.id}')">
-          <div class="item-info">
+          <div class="item-info" style="flex-direction:column; align-items:flex-start; gap:4px; min-width:0;">
             <span class="ex-name">${escapeHtml(ex.name)}</span>
-            ${ex.tagIds && ex.tagIds.length ? `<span class="tags-inline">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</span>` : ''}
+            ${ex.tagIds && ex.tagIds.length ? `<div class="tags-scrollable" style="max-width:100%; width:100%;">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</div>` : ''}
           </div>
-          <div class="item-actions">
+          <div class="item-actions" style="flex-shrink:0; margin-left:auto;">
             <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit exercise" aria-label="Edit exercise">${editIconSvg}</button>
             <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete exercise" aria-label="Delete exercise">${trashIconSvg}</button>
           </div>
@@ -1133,6 +1152,10 @@ function renderPickerList(){
       `).join('');
     } else if (!query) {
       html = `<div class="empty">No exercises found.</div>`;
+    }
+
+    if (query && !exactMatch) {
+      html += `<div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
     }
 
     listContainer.innerHTML = html;
