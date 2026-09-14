@@ -180,6 +180,23 @@
   }
   .modal .filter-bar {
     padding: 0 20px 12px 20px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal .filter-bar::-webkit-scrollbar {
+    height: 4px;
+  }
+  .modal .filter-bar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .modal .filter-bar::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 2px;
   }
   .modal .tag-field-container {
     margin: 0;
@@ -250,6 +267,8 @@
   .tag-toggle{
     font-size:13px; padding:8px 14px; border-radius:999px; border:1px solid var(--border-strong);
     background:var(--card); cursor:pointer; color:var(--text-secondary); font-weight:500;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .tag-toggle.active{background:var(--accent); border-color:var(--accent); color:#fff;}
   .filter-bar{display:flex; flex-wrap:wrap; gap:8px; margin:12px 0;}
@@ -423,8 +442,40 @@ async function loadAll(){
   state.tags = (await safeGet('tags')) || [];
   state.routines = (await safeGet('routines')) || [];
   state.logDates = (await safeGet('logDates')) || [];
+
+  const defaultsLoaded = await safeGet('defaultsLoaded');
+  if (!defaultsLoaded) {
+    await loadDefaults();
+    await safeSet('defaultsLoaded', true);
+  }
+
   await loadLogForDate(state.currentDate);
   render();
+}
+
+async function loadDefaults(){
+  try {
+    const response = await fetch('./defaults.json');
+    if (!response.ok) throw new Error('Failed to fetch defaults');
+    const defaults = await response.json();
+
+    if (defaults.exercises && Array.isArray(defaults.exercises)) {
+      state.exercises.push(...defaults.exercises);
+      await safeSet('exercises', state.exercises);
+    }
+
+    if (defaults.tags && Array.isArray(defaults.tags)) {
+      state.tags.push(...defaults.tags);
+      await safeSet('tags', state.tags);
+    }
+
+    if (defaults.routines && Array.isArray(defaults.routines)) {
+      state.routines.push(...defaults.routines);
+      await safeSet('routines', state.routines);
+    }
+  } catch (e) {
+    console.warn('Failed to load defaults:', e);
+  }
 }
 
 async function loadLogForDate(dateStr){
@@ -595,10 +646,21 @@ function openCreateFromSearch(initialName){
   });
 }
 
+function isExerciseNameExists(name) {
+  const normalizedName = name.trim().toLowerCase();
+  return state.exercises.some(ex => ex.name.trim().toLowerCase() === normalizedName);
+}
+
 async function saveNewExercise(){
   const name = $('#newExNameInput') ? $('#newExNameInput').value.trim() : "";
   if(!name){ state.formError="Enter a name"; render(); return; }
-  
+
+  if (isExerciseNameExists(name)) {
+    state.formError=`Exercise "${name}" already exists`;
+    render();
+    return;
+  }
+
   pushHistory();
   const ex = {id:uid(), name, tagIds:[...state.newExTags]};
   state.exercises.push(ex);
@@ -1096,6 +1158,18 @@ function openEditExercise(exId){
 async function saveEditExercise(){
   const name = $('#newExNameInput') ? $('#newExNameInput').value.trim() : "";
   if(!name){ state.formError="Enter a name"; render(); return; }
+
+  const normalizedName = name.trim().toLowerCase();
+  const isDuplicate = state.exercises.some(ex =>
+    ex.id !== state.editingExerciseId &&
+    ex.name.trim().toLowerCase() === normalizedName
+  );
+  if (isDuplicate) {
+    state.formError=`Exercise "${name}" already exists`;
+    render();
+    return;
+  }
+
   const ex = state.exercises.find(e=>e.id===state.editingExerciseId);
   ex.name = name;
   ex.tagIds = [...state.newExTags];
@@ -1204,7 +1278,7 @@ function renderRoutinesModal(){
                 </div>
               </div>
               <div style="display:flex; gap:4px; align-items:center;">
-                <button class="btn btn-sm btn-primary" onclick="applyRoutine(state.routines.find(x=>x.id==='${r.id}'))">Add Today</button>
+                <button class="btn btn-sm btn-primary" onclick="applyRoutine(state.routines.find(x=>x.id==='${r.id}'))">Add</button>
                 <button class="icon-btn" onclick="openEditRoutineModal('${r.id}')" title="Edit routine" aria-label="Edit routine">${editIconSvg}</button>
                 <button class="icon-btn danger" onclick="deleteRoutine('${r.id}')" title="Delete routine" aria-label="Delete routine">${trashIconSvg}</button>
               </div>

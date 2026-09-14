@@ -1,0 +1,255 @@
+{
+  "version": "1.0.0",
+  "exercises": [
+    {
+      "id": "bench-press",
+      "name": "Bench Press",
+      "tagIds": ["compound", "chest", "push"]
+    },
+    {
+      "id": "squat",
+      "name": "Squat",
+      "tagIds": ["compound", "legs", "quad"]
+    },
+    {
+      "id": "deadlift",
+      "name": "Deadlift",
+      "tagIds": ["compound", "back", "legs", "pull"]
+    },
+    {
+      "id": "overhead-press",
+      "name": "Overhead Press",
+      "tagIds": ["compound", "shoulders", "push"]
+    },
+    {
+      "id": "barbell-row",
+      "name": "Barbell Row",
+      "tagIds": ["compound", "back", "pull"]
+    },
+    {
+      "id": "pull-ups",
+      "name": "Pull-ups",
+      "tagIds": ["compound", "back", "pull", "lats"]
+    },
+    {
+      "id": "dumbbell-bench-press",
+      "name": "Dumbbell Bench Press",
+      "tagIds": ["chest", "push", "dumbbells"]
+    },
+    {
+      "id": "incline-bench-press",
+      "name": "Incline Bench Press",
+      "tagIds": ["chest", "push", "upper-chest"]
+    },
+    {
+      "id": "dumbbell-rows",
+      "name": "Dumbbell Rows",
+      "tagIds": ["back", "pull", "dumbbells"]
+    },
+    {
+      "id": "lat-pulldown",
+      "name": "Lat Pulldown",
+      "tagIds": ["back", "pull", "lats", "machine"]
+    },
+    {
+      "id": "leg-press",
+      "name": "Leg Press",
+      "tagIds": ["legs", "quad", "compound", "machine"]
+    },
+    {
+      "id": "leg-curl",
+      "name": "Leg Curl",
+      "tagIds": ["legs", "hamstring", "machine"]
+    },
+    {
+      "id": "leg-extension",
+      "name": "Leg Extension",
+      "tagIds": ["legs", "quad", "machine"]
+    },
+    {
+      "id": "dumbbell-curls",
+      "name": "Dumbbell Curls",
+      "tagIds": ["arms", "biceps", "dumbbells"]
+    },
+    {
+      "id": "barbell-curls",
+      "name": "Barbell Curls",
+      "tagIds": ["arms", "biceps", "barbell"]
+    },
+    {
+      "id": "tricep-dips",
+      "name": "Tricep Dips",
+      "tagIds": ["arms", "triceps", "compound"]
+    },
+    {
+      "id": "tricep-pushdowns",
+      "name": "Tricep Pushdowns",
+      "tagIds": ["arms", "triceps", "cable"]
+    },
+    {
+      "id": "shoulder-press",
+      "name": "Shoulder Press",
+      "tagIds": ["shoulders", "push", "dumbbells"]
+    },
+    {
+      "id": "lateral-raises",
+      "name": "Lateral Raises",
+      "tagIds": ["shoulders", "side-delts", "dumbbells"]
+    },
+    {
+      "id": "face-pulls",
+      "name": "Face Pulls",
+      "tagIds": ["shoulders", "rear-delts", "cable"]
+    },
+    {
+      "id": "cable-flyes",
+      "name": "Cable Flyes",
+      "tagIds": ["chest", "push", "cable"]
+    },
+    {
+      "id": "pec-deck",
+      "name": "Pec Deck",
+      "tagIds": ["chest", "push", "machine"]
+    },
+    {
+      "id": "seated-leg-press",
+      "name": "Seated Leg Press",
+      "tagIds": ["legs", "quad", "machine"]
+    },
+    {
+      "id": "smith-machine-squat",
+      "name": "Smith Machine Squat",
+      "tagIds": ["legs", "quad", "machine"]
+    },
+    {
+      "id": "hack-squat",
+      "name": "Hack Squat",
+      "tagIds": ["legs", "quad", "machine"]
+    },
+    {
+      "id": "leg-adductor",
+      "name": "Leg Adductor",
+      "tagIds": ["legs", "machine", "inner-thigh"]
+    },
+    {
+      "id": "leg-abductor",
+      "name": "Leg Abductor",
+      "tagIds": ["legs", "machine", "outer-thigh"]
+    },
+    {
+      "id": "cable-woodchops",
+      "name": "Cable Woodchops",
+      "tagIds": ["core", "cable", "obliques"]
+    },
+    {
+      "id": "planks",
+      "name": "Planks",
+      "tagIds": ["core", "bodyweight"]
+    },
+    {
+      "id": "crunches",
+      "name": "Crunches",
+      "tagIds": ["core", "abs", "bodyweight"]
+    },
+    {
+      "id": "hanging-leg-raises",
+      "name": "Hanging Leg Raises",
+      "tagIds": ["core", "abs", "compound"]
+    },
+    {
+      "id": "push-ups",
+      "name": "Push-ups",
+      "tagIds": ["chest", "push", "bodyweight", "compound"]
+    },
+    {
+      "id": "dips",
+      "name": "Dips",
+      "tagIds": ["chest", "triceps", "bodyweight", "compound"]
+    }
+  ],
+  "tags": [
+    { "id": "compound", "name": "Compound" },
+    { "id": "chest", "name": "Chest" },
+    { "id": "back", "name": "Back" },
+    { "id": "legs", "name": "Legs" },
+    { "id": "shoulders", "name": "Shoulders" },
+    { "id": "arms", "name": "Arms" },
+    { "id": "core", "name": "Core" },
+    { "id": "push", "name": "Push" },
+    { "id": "pull", "name": "Pull" },
+    { "id": "biceps", "name": "Biceps" },
+    { "id": "triceps", "name": "Triceps" },
+    { "id": "quad", "name": "Quad" },
+    { "id": "hamstring", "name": "Hamstring" },
+    { "id": "lats", "name": "Lats" },
+    { "id": "abs", "name": "Abs" },
+    { "id": "obliques", "name": "Obliques" },
+    { "id": "dumbbells", "name": "Dumbbells" },
+    { "id": "barbell", "name": "Barbell" },
+    { "id": "cable", "name": "Cable" },
+    { "id": "machine", "name": "Machine" },
+    { "id": "bodyweight", "name": "Bodyweight" },
+    { "id": "side-delts", "name": "Side Delts" },
+    { "id": "rear-delts", "name": "Rear Delts" },
+    { "id": "upper-chest", "name": "Upper Chest" },
+    { "id": "inner-thigh", "name": "Inner Thigh" },
+    { "id": "outer-thigh", "name": "Outer Thigh" }
+  ],
+  "routines": [
+    {
+      "id": "ppl-push",
+      "name": "Push Day (PPL)",
+      "exerciseIds": ["bench-press", "incline-bench-press", "overhead-press", "dumbbell-bench-press", "lateral-raises", "tricep-pushdowns", "tricep-dips"]
+    },
+    {
+      "id": "ppl-pull",
+      "name": "Pull Day (PPL)",
+      "exerciseIds": ["deadlift", "barbell-row", "pull-ups", "lat-pulldown", "dumbbell-rows", "barbell-curls", "dumbbell-curls"]
+    },
+    {
+      "id": "ppl-legs",
+      "name": "Leg Day (PPL)",
+      "exerciseIds": ["squat", "deadlift", "leg-press", "leg-curl", "leg-extension", "leg-adductor", "leg-abductor"]
+    },
+    {
+      "id": "upper-lower-upper",
+      "name": "Upper Power (UL)",
+      "exerciseIds": ["bench-press", "barbell-row", "overhead-press", "pull-ups", "barbell-curls", "tricep-dips"]
+    },
+    {
+      "id": "upper-lower-lower",
+      "name": "Lower Power (UL)",
+      "exerciseIds": ["squat", "deadlift", "leg-press", "leg-curl", "leg-extension", "leg-adductor"]
+    },
+    {
+      "id": "chest-arms",
+      "name": "Chest & Arms",
+      "exerciseIds": ["bench-press", "incline-bench-press", "dumbbell-bench-press", "cable-flyes", "pec-deck", "dumbbell-curls", "barbell-curls", "tricep-pushdowns", "tricep-dips"]
+    },
+    {
+      "id": "back-shoulders",
+      "name": "Back & Shoulders",
+      "exerciseIds": ["barbell-row", "pull-ups", "lat-pulldown", "dumbbell-rows", "overhead-press", "lateral-raises", "face-pulls"]
+    },
+    {
+      "id": "full-body",
+      "name": "Full Body",
+      "exerciseIds": ["bench-press", "squat", "barbell-row", "overhead-press", "leg-curl", "dumbbell-curls"]
+    },
+    {
+      "id": "beginner-strength",
+      "name": "Beginner Strength",
+      "exerciseIds": ["bench-press", "squat", "barbell-row", "overhead-press", "deadlift"]
+    },
+    {
+      "id": "arms-focus",
+      "name": "Arms Focus",
+      "exerciseIds": ["barbell-curls", "dumbbell-curls", "tricep-pushdowns", "tricep-dips", "lateral-raises", "face-pulls"]
+    },
+    {
+      "id": "core-cardio",
+      "name": "Core & Cardio",
+      "exerciseIds": ["planks", "crunches", "hanging-leg-raises", "cable-woodchops", "push-ups"]
+    }
+  ]
+}
