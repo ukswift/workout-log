@@ -69,6 +69,25 @@ A lightweight, installable workout logger PWA — log exercises, sets, reps and 
 
 All data is stored locally in your browser (`localStorage`), scoped to this app's origin. Nothing is sent to a server — each device/browser has its own independent copy. Use the **Export JSON** button to back up your data or move it to another device, and **Import JSON** to restore it.
 
+## Versioning
+
+WorkoutLog uses **semantic versioning** (MAJOR.MINOR.PATCH):
+
+- **MAJOR** — Breaking changes (e.g., data structure changes, removed features)
+- **MINOR** — New features (e.g., new analytics, new filters, UI improvements)
+- **PATCH** — Bug fixes (e.g., keyboard fixes, performance tweaks)
+
+### How to bump version:
+
+1. Edit `index.html` and update `const APP_VERSION = "X.Y.Z";` (line ~287)
+2. Update version in `package.json` if one exists (optional)
+3. Commit with message: `Release v1.2.3` (or similar)
+4. Create a git tag: `git tag v1.2.3 && git push origin v1.2.3`
+
+The version displays in the app under **Profile → About → Version**.
+
+### Current version: 1.0.0
+
 ## Local development
 
 No build step required — it's plain HTML/CSS/JS. Just open `index.html` in a browser, or serve the folder with any static file server for full PWA behavior (service workers require `http(s)://`, not `file://`):

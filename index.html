@@ -285,6 +285,7 @@
 </div>
 
 <script>
+const APP_VERSION = "0.0.1";
 const $ = sel => document.querySelector(sel);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
@@ -930,6 +931,7 @@ function renderProfileModal(){
       <div class="profile-section">
         <h3>About</h3>
         <p style="font-size:14.5px; color:var(--text-secondary); margin:0;">WorkoutLog — a lightweight, installable workout logger. No sign-up, your data stays on this device.</p>
+        <p style="font-size:13px; color:var(--text-muted); margin:8px 0 0;">Version ${APP_VERSION}</p>
       </div>
       <div class="profile-section">
         <h3>Source</h3>
