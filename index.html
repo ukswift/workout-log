@@ -787,6 +787,116 @@ async function deleteSet(entryId, setId){
   await saveCurrentLog();
 }
 
+function openDatePicker(){
+  state.modal='datepicker';
+  state.calendarViewDate = null;
+  render();
+}
+
+async function selectDate(dateStr){
+  state.currentDate = dateStr;
+  state.modal = null;
+  state.calendarViewDate = null;
+  await loadLogForDate(state.currentDate);
+  render();
+}
+
+function goToToday(){
+  state.currentDate = fmtDate(new Date());
+  state.calendarViewDate = null;
+  state.modal = null;
+  loadLogForDate(state.currentDate);
+  render();
+}
+
+function renderDatePicker(){
+  const displayDate = state.calendarViewDate || state.currentDate;
+  const date = new Date(displayDate + "T00:00:00");
+  const today = fmtDate(new Date());
+  const year = date.getFullYear();
+  const month = date.getMonth();
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+
+  const monthName = date.toLocaleString(undefined, {month:'long', year:'numeric'});
+
+  let calendarHtml = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:6px;">';
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  dayNames.forEach(day => {
+    calendarHtml += `<div style="text-align:center; font-weight:600; font-size:12px; color:var(--text-secondary); padding:4px;">${day}</div>`;
+  });
+
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    calendarHtml += '<div></div>';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const isToday = dateStr === today;
+    const isSelected = dateStr === state.currentDate;
+    let bgColor = 'transparent';
+    let color = 'var(--text)';
+
+    if (isToday && isSelected) {
+      bgColor = 'var(--accent)';
+      color = '#fff';
+    } else if (isToday) {
+      bgColor = 'var(--success)';
+      color = '#fff';
+    } else if (isSelected) {
+      bgColor = 'var(--accent)';
+      color = '#fff';
+    }
+
+    calendarHtml += `
+      <button style="
+        padding:8px 4px;
+        border:none;
+        background:${bgColor};
+        color:${color};
+        border-radius:8px;
+        cursor:pointer;
+        font-weight:500;
+        font-size:14px;
+      " onclick="selectDate('${dateStr}')">${day}</button>
+    `;
+  }
+
+  calendarHtml += '</div>';
+
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="max-width:320px;">
+        <h2 style="margin:0 0 16px; text-align:center;">${monthName}</h2>
+        <div style="display:flex; gap:8px; margin-bottom:12px; justify-content:center;">
+          <button class="btn btn-sm" onclick="
+            const d = new Date((state.calendarViewDate || state.currentDate) + 'T00:00:00');
+            d.setMonth(d.getMonth() - 1);
+            state.calendarViewDate = fmtDate(d);
+            render();
+          ">← Prev</button>
+          <button class="btn btn-sm btn-primary" onclick="goToToday()">Today</button>
+          <button class="btn btn-sm" onclick="
+            const d = new Date((state.calendarViewDate || state.currentDate) + 'T00:00:00');
+            d.setMonth(d.getMonth() + 1);
+            state.calendarViewDate = fmtDate(d);
+            render();
+          ">Next →</button>
+        </div>
+        <div style="padding:12px;">
+          ${calendarHtml}
+        </div>
+        <div class="footer-actions">
+          <button class="btn" style="width:100%;" onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function openRoutinesModal(){ state.modal='routines'; render(); }
 function openNewRoutineModal(){
   state.modal='newRoutine';
@@ -892,7 +1002,7 @@ function render(){
       </div>
       <div class="date-nav">
         <button class="btn-ghost" onclick="changeDate(-1)">&larr;</button>
-        <span>${displayDate(state.currentDate)}</span>
+        <button class="btn-ghost" style="cursor:pointer; padding:4px 12px; border:1px solid var(--border); border-radius:6px; background:transparent; color:inherit; font-size:14px;" onclick="openDatePicker()">${displayDate(state.currentDate)}</button>
         <button class="btn-ghost" onclick="changeDate(1)" ${state.currentDate===fmtDate(new Date())?'style="visibility:hidden"':''}>&rarr;</button>
       </div>
     </div>
@@ -1061,6 +1171,7 @@ function renderModal(){
   if(state.modal==='routines') return renderRoutinesModal();
   if(state.modal==='newRoutine') return renderNewRoutineModal();
   if(state.modal==='profile') return renderProfileModal();
+  if(state.modal==='datepicker') return renderDatePicker();
   return '';
 }
 
