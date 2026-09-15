@@ -349,6 +349,7 @@
   .setting-field label{margin:0; color:var(--text);}
   .setting-number{width:104px!important; margin:0!important; padding:9px!important; text-align:center;}
   .set-picker-modal{height:410px; border-radius:20px 20px 0 0;}
+  .day-actions-modal{height:auto; border-radius:20px 20px 0 0; padding:20px;}
   .set-picker-columns{display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 20px; flex:1; overflow:hidden;}
   .wheel-label{margin:0!important; text-align:center;}
   .wheel-picker{height:220px; overflow-y:auto; scroll-snap-type:y mandatory; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; background:linear-gradient(to bottom, transparent 88px, var(--accent-bg) 88px, var(--accent-bg) 132px, transparent 132px); mask-image:linear-gradient(transparent, #000 25%, #000 75%, transparent);}
@@ -413,6 +414,7 @@ let state = {
   newRoutineName: "",
   newRoutineExIds: [],
   routineSearch: '',
+  routineCancelTarget: 'routines',
   settings: { showTags: false, pickerLimits: { weightMin: 0.25, weightMax: 1000, weightStep: 5, repsMin: 1, repsMax: 1000, repsStep: 1 } },
   pickerSelection: { weight: 0.25, reps: 1 }
 };
@@ -931,6 +933,7 @@ function openNewRoutineModal(){
   state.newRoutineName = "";
   state.newRoutineExIds = [];
   state.routineSearch = '';
+  state.routineCancelTarget = 'routines';
   render();
 }
 
@@ -942,6 +945,7 @@ function openEditRoutineModal(routineId){
   state.newRoutineName = r.name;
   state.newRoutineExIds = [...r.exerciseIds];
   state.routineSearch = '';
+  state.routineCancelTarget = 'routines';
   render();
 }
 
@@ -971,7 +975,7 @@ function setRoutineSearch(value){
 function openCreatePresetFromCurrentLog(){
   const exerciseIds = [...new Set(state.currentLog.map(entry => entry.exerciseId))];
   if(exerciseIds.length === 0){
-    showToast('Add a workout before saving a preset', false);
+    showToast('Add a workout to this day before saving it as a preset', false);
     return;
   }
   state.modal = 'newRoutine';
@@ -979,6 +983,7 @@ function openCreatePresetFromCurrentLog(){
   state.newRoutineName = '';
   state.newRoutineExIds = exerciseIds;
   state.routineSearch = '';
+  state.routineCancelTarget = null;
   render();
 }
 
@@ -1052,7 +1057,7 @@ function render(){
           <h1>WorkoutLog</h1>
         </div>
         <div>
-          <button class="btn btn-sm" onclick="openRoutinesModal()">Presets</button>
+          <button class="btn btn-sm" onclick="openDayActions()">More</button>
         </div>
       </div>
       <div class="date-nav">
@@ -1078,6 +1083,7 @@ function render(){
 
 function openProfile(){ state.modal='profile'; render(); }
 function openSettings(){ state.modal='settings'; render(); }
+function openDayActions(){ state.modal='dayActions'; render(); }
 
 async function updateSetting(key, enabled){
   state.settings[key] = enabled;
@@ -1106,7 +1112,6 @@ function renderLogListContent(){
         <p style="margin-bottom:18px;">No logs found.</p>
         <div style="display:flex; flex-direction:column; gap:12px; max-width:280px; margin:0 auto;">
           <button class="btn btn-primary" style="justify-content:center;" onclick="openPicker()">+ Log workout</button>
-          <button class="btn" style="justify-content:center;" onclick="openRoutinesModal()">Load preset</button>
           <button class="btn" style="justify-content:center;" onclick="triggerImport()">Import log</button>
         </div>
       </div>
@@ -1184,8 +1189,7 @@ function renderActionFooter(){
   return `
     <div class="center-action-area">
       <button class="btn btn-primary" style="padding:14px 28px; font-size:16px;" onclick="openPicker()">+ Log workout</button>
-      <button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openRoutinesModal()">Load preset</button>
-      <button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openCreatePresetFromCurrentLog()">Save today as preset</button>
+      ${state.currentLog.length === 0 ? '<button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openRoutinesModal()">Load preset</button>' : ''}
     </div>
   `;
 }
@@ -1284,6 +1288,7 @@ function renderModal(){
   if(state.modal==='profile') return renderProfileModal();
   if(state.modal==='settings') return renderSettingsModal();
   if(state.modal==='setPicker') return renderSetPickerModal();
+  if(state.modal==='dayActions') return renderDayActionsModal();
   if(state.modal==='datepicker') return renderDatePicker();
   return '';
 }
@@ -1297,6 +1302,7 @@ function renderProfileModal(){
       </div>
       <div class="profile-option-list">
         <button class="btn" style="width:100%; justify-content:center;" onclick="openSettings()">Settings</button>
+        <button class="btn" style="width:100%; justify-content:center;" onclick="openRoutinesModal()">Presets</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="triggerImport()">Import</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="exportData()">Export</button>
       </div>
@@ -1363,7 +1369,7 @@ function renderSetPickerModal(){
   const selectedReps = limits.repsMin + Math.round((rawReps - limits.repsMin) / limits.repsStep) * limits.repsStep;
   setTimeout(() => initSetPickerWheels(selectedWeight, selectedReps), 0);
   return `
-    <div class="modal-overlay">
+    <div class="modal-overlay" onclick="if(event.target===this) cancelSetPicker()">
       <div class="modal set-picker-modal">
         <h2>Log set</h2>
         <div class="set-picker-columns">
@@ -1371,6 +1377,16 @@ function renderSetPickerModal(){
           <label class="wheel-label">Reps<div class="wheel-picker" id="setPickerReps" onscroll="updatePickerValue('reps', this.scrollTop)"><div class="wheel-spacer"></div>${reps.map(value => `<div class="wheel-option">${value}</div>`).join('')}<div class="wheel-spacer"></div></div></label>
         </div>
         <div class="footer-actions"><button class="btn btn-primary" style="flex:1" onclick="saveSetPicker()">Save set</button><button class="btn" onclick="cancelSetPicker()">Cancel</button></div>
+      </div>
+    </div>`;
+}
+
+function renderDayActionsModal(){
+  return `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal day-actions-modal">
+        <button class="btn" style="width:100%; justify-content:center;" onclick="openCreatePresetFromCurrentLog()">Save day as preset</button>
+        <button class="btn" style="width:100%; justify-content:center; margin-top:10px;" onclick="closeModal()">Cancel</button>
       </div>
     </div>`;
 }
@@ -1630,7 +1646,7 @@ function renderNewRoutineModal(){
         </div>
         <div class="footer-actions">
           <button class="btn btn-primary" style="flex:1;" onclick="saveRoutine()">${isEdit ? 'Save Changes' : 'Save Preset'}</button>
-          <button class="btn" onclick="openRoutinesModal()">Cancel</button>
+          <button class="btn" onclick="${state.routineCancelTarget === 'routines' ? 'openRoutinesModal()' : 'closeModal()'}">Cancel</button>
         </div>
       </div>
     </div>
