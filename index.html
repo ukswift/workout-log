@@ -80,7 +80,7 @@
   #log-list { display: flex; flex-direction: column; gap: 12px; }
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
-    padding:14px 16px; margin-bottom:0; transition: transform 0.15s ease, opacity 0.15s ease;
+    padding:12px 14px; margin-bottom:0; transition: transform 0.15s ease, opacity 0.15s ease;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   .card.dragging-source{
@@ -131,19 +131,33 @@
     flex-shrink:0;
   }
   
-  .sets-line{font-size:14px; color:var(--text-secondary); margin-top:10px; line-height:1.8; display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
+  .sets-line{font-size:14px; color:var(--text-secondary); margin-top:8px; line-height:1.8; display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
   .set-chip{
     display:inline-flex; align-items:center; background:var(--bg); border:1px solid var(--border-strong);
     border-radius:8px; padding:6px 12px; font-size:14px; font-weight:500; cursor:pointer; min-height:36px;
   }
   .set-chip:active{transform: scale(0.96); opacity:0.7;}
+  .set-tiles{display:flex; gap:6px; width:100%; overflow-x:auto; overflow-y:hidden; padding:2px 0 4px; -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity;}
+  .set-pill{
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 auto; padding:9px 16px; min-height:40px; border-radius:999px;
+    border:1px solid var(--border-strong); background:var(--bg); color:var(--text);
+    font-size:14px; font-weight:600; white-space:nowrap; cursor:pointer;
+    scroll-snap-align:start; user-select:none; transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .set-pill:active{transform: scale(0.95); background:var(--accent-bg);}
+  .set-pill-dragging{
+    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+    background:var(--accent-bg); border-color:var(--accent); opacity:0.97;
+  }
+  .set-tile-add{flex:0 0 40px; min-height:40px; border-radius:999px; margin:0;}
   .add-set-icon-btn{
     display:inline-flex; align-items:center; justify-content:center;
-    width:36px; height:36px; border-radius:50%; background:var(--accent-bg);
+    width:32px; height:32px; border-radius:50%; background:var(--accent-bg);
     color:var(--accent); border:1px solid var(--accent); font-weight:bold;
-    font-size:20px; cursor:pointer; line-height:1; vertical-align:middle; margin-left:2px;
+    font-size:18px; cursor:pointer; line-height:1; vertical-align:middle; margin-left:2px;
   }
-  .add-set-icon-btn:active{transform: scale(0.92);}
+  .add-set-icon-btn:active{transform: scale(0.9);}
   
   .set-edit-inline{
     display:flex; align-items:center; gap:8px; background:var(--accent-bg);
@@ -648,6 +662,7 @@ function handleDrop(e, targetIndex) {
 }
 
 function handleDragEnd(e) {
+  if(e.currentTarget) e.currentTarget.draggable = false;
   cleanupDrag();
 }
 
@@ -1123,8 +1138,7 @@ function renderLogListContent(){
     const name = ex ? ex.name : "(deleted workout)";
     const tags = state.settings.showTags && ex && ex.tagIds ? ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('') : '';
 
-    let setNum = 0;
-    const completedChips = [];
+    const completedTiles = [];
     let editingHtml = '';
 
     entry.sets.forEach(s => {
@@ -1142,32 +1156,33 @@ function renderLogListContent(){
             <button class="save-set-btn" onclick="toggleEditSet('${entry.id}','${s.id}')" title="Save set" aria-label="Save set">${checkIconSvg}</button>
           </div>`;
       } else if (isComplete) {
-        setNum++;
-        completedChips.push(`<span class="set-chip" onclick="toggleEditSet('${entry.id}','${s.id}')">Set ${setNum}: ${s.weight}lbs × ${s.reps}reps</span>`);
+        completedTiles.push(`<button class="set-pill" data-set-id="${s.id}" onpointerdown="handlePillPointerDown(event,'${entry.id}','${s.id}')">${s.weight}lbs x ${s.reps}</button>`);
       }
     });
 
     let setsContent = '';
-    if (completedChips.length === 0 && !editingHtml) {
+    if (completedTiles.length === 0 && !editingHtml) {
       setsContent = `<button class="btn btn-sm" style="width:100%; justify-content:center;" onclick="addSetInline('${entry.id}')">+ Add set</button>`;
     } else {
       setsContent = `
-        ${completedChips.join('')}
-        ${editingHtml}
-        <button class="add-set-icon-btn" onclick="addSetInline('${entry.id}')" title="Add set" aria-label="Add set">+</button>
+        <div class="set-tiles">
+          ${completedTiles.join('')}
+          ${editingHtml}
+          <button class="add-set-icon-btn set-tile-add" onclick="addSetInline('${entry.id}')" title="Add set" aria-label="Add set">+</button>
+        </div>
       `;
     }
 
     return `
       <div class="card"
-           draggable="true"
+           draggable="false"
            ondragstart="handleDragStart(event, ${index})"
            ondragover="handleDragOver(event, ${index})"
            ondrop="handleDrop(event, ${index})"
            ondragend="handleDragEnd(event)">
         <div class="card-header">
           <div class="header-left">
-            <span class="drag-handle" title="Drag to reorder">≡</span>
+            <span class="drag-handle" title="Drag to reorder" onpointerdown="this.closest('.card').draggable=true" onpointerup="this.closest('.card').draggable=false">≡</span>
             <span class="ex-name">${escapeHtml(name)}</span>
             ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
           </div>
@@ -1192,6 +1207,126 @@ function renderActionFooter(){
       ${state.currentLog.length === 0 ? '<button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openRoutinesModal()">Load preset</button>' : ''}
     </div>
   `;
+}
+
+let pillDrag = null;
+const LONG_PRESS_MS = 350;
+const MOVE_CANCEL_PX = 8;
+
+function handlePillPointerDown(e, entryId, setId){
+  const pillEl = e.currentTarget;
+  try { pillEl.setPointerCapture(e.pointerId); } catch(err) {}
+  const startX = e.clientX, startY = e.clientY;
+  let longPress = false;
+  let moved = false;
+
+  const timer = setTimeout(() => {
+    longPress = true;
+    beginPillDrag(pillEl, entryId, startX, startY);
+  }, LONG_PRESS_MS);
+
+  function onMove(ev){
+    if(!longPress){
+      if(Math.abs(ev.clientX-startX) > MOVE_CANCEL_PX || Math.abs(ev.clientY-startY) > MOVE_CANCEL_PX){
+        moved = true;
+        clearTimeout(timer);
+      }
+      return;
+    }
+    ev.preventDefault();
+    updatePillDrag(ev);
+  }
+
+  function onUp(ev){
+    clearTimeout(timer);
+    pillEl.removeEventListener('pointermove', onMove);
+    pillEl.removeEventListener('pointerup', onUp);
+    pillEl.removeEventListener('pointercancel', onUp);
+    try { pillEl.releasePointerCapture(e.pointerId); } catch(err) {}
+    if(longPress){
+      endPillDrag();
+    } else if(!moved){
+      toggleEditSet(entryId, setId);
+    }
+  }
+
+  pillEl.addEventListener('pointermove', onMove);
+  pillEl.addEventListener('pointerup', onUp);
+  pillEl.addEventListener('pointercancel', onUp);
+}
+
+function beginPillDrag(pillEl, entryId, startX, startY){
+  triggerHaptic();
+  const container = pillEl.closest('.set-tiles');
+  if(!container) return;
+  const pills = Array.from(container.querySelectorAll('.set-pill'));
+  pillDrag = {
+    entryId,
+    pillEl,
+    container,
+    startX, startY,
+    order: pills.map(p => p.dataset.setId)
+  };
+  pillEl.classList.add('set-pill-dragging');
+  pillEl.style.position = 'relative';
+  pillEl.style.zIndex = '5';
+  pillEl.style.pointerEvents = 'none';
+}
+
+function updatePillDrag(ev){
+  if(!pillDrag) return;
+  const dx = ev.clientX - pillDrag.startX;
+  const dy = ev.clientY - pillDrag.startY;
+  pillDrag.pillEl.style.transform = `translate(${dx}px, ${dy}px) scale(1.06)`;
+
+  const targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+  const targetPill = targetEl && targetEl.closest && targetEl.closest('.set-pill');
+  if(!targetPill || !pillDrag.container.contains(targetPill)) return;
+
+  const draggedId = pillDrag.pillEl.dataset.setId;
+  const targetId = targetPill.dataset.setId;
+  if(targetId === draggedId) return;
+
+  const order = pillDrag.order;
+  const from = order.indexOf(draggedId);
+  const to = order.indexOf(targetId);
+  if(from === -1 || to === -1 || from === to) return;
+
+  order.splice(from, 1);
+  order.splice(to, 0, draggedId);
+
+  const addBtn = pillDrag.container.querySelector('.set-tile-add');
+  order.forEach(id => {
+    const el = pillDrag.container.querySelector(`.set-pill[data-set-id="${id}"]`);
+    if(el) pillDrag.container.insertBefore(el, addBtn);
+  });
+  triggerHaptic();
+}
+
+async function endPillDrag(){
+  if(!pillDrag) return;
+  const { entryId, order, pillEl } = pillDrag;
+  pillEl.classList.remove('set-pill-dragging');
+  pillEl.style.transform = '';
+  pillEl.style.position = '';
+  pillEl.style.zIndex = '';
+  pillEl.style.pointerEvents = '';
+
+  const entry = state.currentLog.find(e => e.id === entryId);
+  if(entry){
+    const isComplete = s => s.weight !== '' && s.reps !== '';
+    const completedById = {};
+    entry.sets.filter(isComplete).forEach(s => { completedById[s.id] = s; });
+    const reordered = order.map(id => completedById[id]).filter(Boolean);
+    if(reordered.length === entry.sets.filter(isComplete).length){
+      pushHistory();
+      let ci = 0;
+      entry.sets = entry.sets.map(s => isComplete(s) ? reordered[ci++] : s);
+      await saveCurrentLog();
+    }
+  }
+  pillDrag = null;
+  render();
 }
 
 function toggleEditSet(entryId, setId){
@@ -1245,6 +1380,15 @@ async function cancelSetPicker(){
   state.modal = null;
   await saveCurrentLog();
   render();
+}
+
+async function deleteSetFromPicker(){
+  const edit = state.editingSet;
+  if(!edit) return;
+  const { entryId, setId } = edit;
+  state.modal = null;
+  state.editingSet = null;
+  await deleteSet(entryId, setId);
 }
 
 async function addSetInline(entryId){
@@ -1376,7 +1520,11 @@ function renderSetPickerModal(){
           <label class="wheel-label">Weight (lb)<div class="wheel-picker" id="setPickerWeight" onscroll="updatePickerValue('weight', this.scrollTop)"><div class="wheel-spacer"></div>${weights.map(value => `<div class="wheel-option">${value}</div>`).join('')}<div class="wheel-spacer"></div></div></label>
           <label class="wheel-label">Reps<div class="wheel-picker" id="setPickerReps" onscroll="updatePickerValue('reps', this.scrollTop)"><div class="wheel-spacer"></div>${reps.map(value => `<div class="wheel-option">${value}</div>`).join('')}<div class="wheel-spacer"></div></div></label>
         </div>
-        <div class="footer-actions"><button class="btn btn-primary" style="flex:1" onclick="saveSetPicker()">Save set</button><button class="btn" onclick="cancelSetPicker()">Cancel</button></div>
+        <div class="footer-actions">
+          <button class="btn btn-primary" style="flex:1" onclick="saveSetPicker()">Save set</button>
+          ${edit && !edit.isNew ? `<button class="btn btn-danger" onclick="deleteSetFromPicker()">Delete</button>` : ''}
+          <button class="btn" onclick="cancelSetPicker()">Cancel</button>
+        </div>
       </div>
     </div>`;
 }
