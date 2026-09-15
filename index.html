@@ -74,6 +74,8 @@
   .header-main{display:flex; align-items:center; justify-content:space-between; gap:8px;}
   .header-brand{display:flex; align-items:center; gap:8px;}
   .date-nav{display:flex; align-items:center; justify-content:center; gap:12px; margin-top:10px; color:var(--text-secondary); font-size:16px; font-weight:600;}
+  .routine-selected-list{border:1px solid var(--accent); border-radius:10px; overflow:hidden; margin-bottom:12px;}
+  .routine-all-label{margin-top:8px;}
   
   #log-list { display: flex; flex-direction: column; gap: 12px; }
   .card{
@@ -175,7 +177,7 @@
   
   /* Fullscreen Modal & Notch Safe Area fixes */
   .modal-overlay{
-    position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex;
+    position:fixed; top:0; right:0; left:0; height:var(--app-viewport-height, 100dvh); background:rgba(0,0,0,0.5); display:flex;
     align-items:flex-end; justify-content:center; z-index:100;
     padding-top: env(safe-area-inset-top);
   }
@@ -337,6 +339,22 @@
   }
   .profile-link{color:var(--accent); text-decoration:none; font-size:15px; word-break:break-all;}
   .profile-link:hover{text-decoration:underline;}
+  .setting-row{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid var(--border);}
+  .setting-row:last-child{border-bottom:none;}
+  .setting-row input{width:22px; height:22px; margin:0; flex-shrink:0;}
+  .settings-group{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:0 16px; margin-bottom:20px;}
+  .settings-group-title{font-size:13px; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.04em; margin:0 0 10px;}
+  .setting-field{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--border);}
+  .setting-field:last-child{border-bottom:none;}
+  .setting-field label{margin:0; color:var(--text);}
+  .setting-number{width:104px!important; margin:0!important; padding:9px!important; text-align:center;}
+  .set-picker-modal{height:410px; border-radius:20px 20px 0 0;}
+  .set-picker-columns{display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 20px; flex:1; overflow:hidden;}
+  .wheel-label{margin:0!important; text-align:center;}
+  .wheel-picker{height:220px; overflow-y:auto; scroll-snap-type:y mandatory; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; background:linear-gradient(to bottom, transparent 88px, var(--accent-bg) 88px, var(--accent-bg) 132px, transparent 132px); mask-image:linear-gradient(transparent, #000 25%, #000 75%, transparent);}
+  .wheel-picker::-webkit-scrollbar{display:none;}
+  .wheel-option{height:44px; scroll-snap-align:center; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--text-secondary);}
+  .wheel-spacer{height:88px; flex:none;}
 
   .action-footer{
     flex-shrink: 0;
@@ -393,7 +411,10 @@ let state = {
   tagInputQuery: "",
   editingRoutineId: null,
   newRoutineName: "",
-  newRoutineExIds: []
+  newRoutineExIds: [],
+  routineSearch: '',
+  settings: { showTags: false, pickerLimits: { weightMin: 0.25, weightMax: 1000, weightStep: 5, repsMin: 1, repsMax: 1000, repsStep: 1 } },
+  pickerSelection: { weight: 0.25, reps: 1 }
 };
 
 let historyStack = [];
@@ -464,6 +485,12 @@ async function loadAll(){
   state.tags = (await safeGet('tags')) || [];
   state.routines = (await safeGet('routines')) || [];
   state.logDates = (await safeGet('logDates')) || [];
+  const savedSettings = await safeGet('settings');
+  if(savedSettings) state.settings = { ...state.settings, ...savedSettings, pickerLimits: { ...state.settings.pickerLimits, ...(savedSettings.pickerLimits || {}) } };
+  try {
+    const config = await fetch('./defaults.json').then(response => response.json());
+    if(!savedSettings?.pickerLimits && config.pickerLimits) state.settings.pickerLimits = config.pickerLimits;
+  } catch(e) {}
 
   const defaultsLoaded = await safeGet('defaultsLoaded');
   if (!defaultsLoaded) {
@@ -700,8 +727,8 @@ async function saveNewExercise(){
     isNew: true, 
     initialValues: {weight: newSet.weight, reps: newSet.reps}
   };
+  state.modal='setPicker';
   render();
-  focusWeightInput();
   await safeSet('exercises', state.exercises);
   await saveCurrentLog();
 }
@@ -762,8 +789,8 @@ async function addExerciseToLog(exerciseId){
   }
 
   state.modal=null;
+  state.modal='setPicker';
   render();
-  focusWeightInput();
   await saveCurrentLog();
 }
 
@@ -903,6 +930,7 @@ function openNewRoutineModal(){
   state.editingRoutineId = null;
   state.newRoutineName = "";
   state.newRoutineExIds = [];
+  state.routineSearch = '';
   render();
 }
 
@@ -913,6 +941,7 @@ function openEditRoutineModal(routineId){
   state.editingRoutineId = r.id;
   state.newRoutineName = r.name;
   state.newRoutineExIds = [...r.exerciseIds];
+  state.routineSearch = '';
   render();
 }
 
@@ -924,6 +953,32 @@ function toggleRoutineEx(id){
   const idx = state.newRoutineExIds.indexOf(id);
   if(idx > -1) state.newRoutineExIds.splice(idx, 1);
   else state.newRoutineExIds.push(id);
+  render();
+}
+
+function setRoutineSearch(value){
+  state.routineSearch = value;
+  render();
+  requestAnimationFrame(() => {
+    const input = $('#routineSearchInput');
+    if(input){
+      input.focus();
+      input.setSelectionRange(value.length, value.length);
+    }
+  });
+}
+
+function openCreatePresetFromCurrentLog(){
+  const exerciseIds = [...new Set(state.currentLog.map(entry => entry.exerciseId))];
+  if(exerciseIds.length === 0){
+    showToast('Add a workout before saving a preset', false);
+    return;
+  }
+  state.modal = 'newRoutine';
+  state.editingRoutineId = null;
+  state.newRoutineName = '';
+  state.newRoutineExIds = exerciseIds;
+  state.routineSearch = '';
   render();
 }
 
@@ -1022,6 +1077,26 @@ function render(){
 }
 
 function openProfile(){ state.modal='profile'; render(); }
+function openSettings(){ state.modal='settings'; render(); }
+
+async function updateSetting(key, enabled){
+  state.settings[key] = enabled;
+  await safeSet('settings', state.settings);
+  render();
+}
+
+async function savePickerLimits(){
+  const next = {
+    weightMin: Number($('#weightMinSetting').value), weightMax: Number($('#weightMaxSetting').value), weightStep: Number($('#weightStepSetting').value),
+    repsMin: Number($('#repsMinSetting').value), repsMax: Number($('#repsMaxSetting').value), repsStep: Number($('#repsStepSetting').value)
+  };
+  if(next.weightMin <= 0 || next.weightMax < next.weightMin || next.weightStep <= 0 || next.repsMin < 1 || next.repsMax < next.repsMin || next.repsStep < 1 || !Number.isInteger(next.repsStep)) {
+    showToast('Enter valid picker limits', false); return;
+  }
+  state.settings.pickerLimits = next;
+  await safeSet('settings', state.settings);
+  showToast('Picker limits saved', false);
+}
 
 function renderLogListContent(){
   const isAppEmpty = state.exercises.length===0 && state.routines.length===0 && state.logDates.length===0;
@@ -1041,7 +1116,7 @@ function renderLogListContent(){
   let cardsHtml = state.currentLog.map((entry, index) => {
     const ex = state.exercises.find(e=>e.id===entry.exerciseId);
     const name = ex ? ex.name : "(deleted workout)";
-    const tags = ex && ex.tagIds ? ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('') : '';
+    const tags = state.settings.showTags && ex && ex.tagIds ? ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('') : '';
 
     let setNum = 0;
     const completedChips = [];
@@ -1110,26 +1185,62 @@ function renderActionFooter(){
     <div class="center-action-area">
       <button class="btn btn-primary" style="padding:14px 28px; font-size:16px;" onclick="openPicker()">+ Log workout</button>
       <button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openRoutinesModal()">Load preset</button>
+      <button class="btn" style="padding:14px 28px; font-size:16px;" onclick="openCreatePresetFromCurrentLog()">Save today as preset</button>
     </div>
   `;
 }
 
 function toggleEditSet(entryId, setId){
   triggerHaptic();
-  if(state.editingSet && state.editingSet.entryId===entryId && state.editingSet.setId===setId){
-    state.editingSet = null;
-  } else {
-    const entry = state.currentLog.find(e=>e.id===entryId);
-    const set = entry ? entry.sets.find(s=>s.id===setId) : null;
-    state.editingSet = {
-      entryId, 
-      setId, 
-      isNew: false,
-      initialValues: set ? { weight: set.weight, reps: set.reps } : null
-    };
-  }
+  const entry = state.currentLog.find(e=>e.id===entryId);
+  const set = entry ? entry.sets.find(s=>s.id===setId) : null;
+  state.editingSet = { entryId, setId, isNew: false, initialValues: set ? { weight: set.weight, reps: set.reps } : null };
+  state.modal = 'setPicker';
   render();
-  if (state.editingSet) focusWeightInput();
+}
+
+async function saveSetPicker(){
+  const edit = state.editingSet;
+  const entry = edit && state.currentLog.find(e => e.id === edit.entryId);
+  const set = entry && entry.sets.find(s => s.id === edit.setId);
+  if(!set) return;
+  set.weight = state.pickerSelection.weight;
+  set.reps = state.pickerSelection.reps;
+  state.editingSet = null;
+  state.modal = null;
+  await saveCurrentLog();
+  render();
+}
+
+function updatePickerValue(kind, scrollTop){
+  const limits = state.settings.pickerLimits;
+  const index = Math.round(scrollTop / 44);
+  state.pickerSelection[kind] = kind === 'weight'
+    ? Number((limits.weightMin + index * limits.weightStep).toFixed(2))
+    : limits.repsMin + index * limits.repsStep;
+}
+
+function initSetPickerWheels(weight, reps){
+  state.pickerSelection = { weight, reps };
+  const limits = state.settings.pickerLimits;
+  const weightWheel = $('#setPickerWeight');
+  const repsWheel = $('#setPickerReps');
+  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * 44;
+  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * 44;
+}
+
+async function cancelSetPicker(){
+  const edit = state.editingSet;
+  const entry = edit && state.currentLog.find(e => e.id === edit.entryId);
+  if(entry && edit.isNew) entry.sets = entry.sets.filter(s => s.id !== edit.setId);
+  else if(entry && edit.initialValues) {
+    const set = entry.sets.find(s => s.id === edit.setId);
+    if(set) Object.assign(set, edit.initialValues);
+  }
+  state.editingSet = null;
+  state.modal = null;
+  await saveCurrentLog();
+  render();
 }
 
 async function addSetInline(entryId){
@@ -1145,6 +1256,7 @@ async function addSetInline(entryId){
     isNew: true,
     initialValues: {weight: newSet.weight, reps: newSet.reps}
   };
+  state.modal='setPicker';
   render();
 
   requestAnimationFrame(() => {
@@ -1157,7 +1269,6 @@ async function addSetInline(entryId){
           logList.scrollTop = scrollNeeded;
         }
       }
-      focusWeightInput();
     }
   });
 
@@ -1171,6 +1282,8 @@ function renderModal(){
   if(state.modal==='routines') return renderRoutinesModal();
   if(state.modal==='newRoutine') return renderNewRoutineModal();
   if(state.modal==='profile') return renderProfileModal();
+  if(state.modal==='settings') return renderSettingsModal();
+  if(state.modal==='setPicker') return renderSetPickerModal();
   if(state.modal==='datepicker') return renderDatePicker();
   return '';
 }
@@ -1183,6 +1296,7 @@ function renderProfileModal(){
         <div class="profile-name">Me</div>
       </div>
       <div class="profile-option-list">
+        <button class="btn" style="width:100%; justify-content:center;" onclick="openSettings()">Settings</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="triggerImport()">Import</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="exportData()">Export</button>
       </div>
@@ -1200,6 +1314,65 @@ function renderProfileModal(){
       </div>
     </div>
   `;
+}
+
+function renderSettingsModal(){
+  return `
+    <div class="fullscreen-panel">
+      <h2 style="margin:0 0 24px;">Settings</h2>
+      <div class="profile-section">
+        <div class="settings-group-title">Display</div>
+        <div class="settings-group">
+        <div class="setting-row">
+          <div><strong>Show exercise tags</strong><div style="font-size:13px; color:var(--text-secondary); margin-top:3px;">Off keeps workout cards compact.</div></div>
+          <input type="checkbox" ${state.settings.showTags ? 'checked' : ''} onchange="updateSetting('showTags', this.checked)">
+        </div>
+        </div>
+      </div>
+      <div class="profile-section">
+        <div class="settings-group-title">Set picker</div>
+        <div class="settings-group">
+          <div class="setting-field"><label for="weightMinSetting">Minimum weight (lb)</label><input class="setting-number" type="number" id="weightMinSetting" min="0.25" step="0.25" value="${state.settings.pickerLimits.weightMin}"></div>
+          <div class="setting-field"><label for="weightMaxSetting">Maximum weight (lb)</label><input class="setting-number" type="number" id="weightMaxSetting" min="0.25" step="0.25" value="${state.settings.pickerLimits.weightMax}"></div>
+          <div class="setting-field"><label for="weightStepSetting">Weight increment (lb)</label><input class="setting-number" type="number" id="weightStepSetting" min="0.25" step="0.25" value="${state.settings.pickerLimits.weightStep}"></div>
+          <div class="setting-field"><label for="repsMinSetting">Minimum reps</label><input class="setting-number" type="number" id="repsMinSetting" min="1" step="1" value="${state.settings.pickerLimits.repsMin}"></div>
+          <div class="setting-field"><label for="repsMaxSetting">Maximum reps</label><input class="setting-number" type="number" id="repsMaxSetting" min="1" step="1" value="${state.settings.pickerLimits.repsMax}"></div>
+          <div class="setting-field"><label for="repsStepSetting">Rep increment</label><input class="setting-number" type="number" id="repsStepSetting" min="1" step="1" value="${state.settings.pickerLimits.repsStep}"></div>
+        </div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="savePickerLimits()">Save picker settings</button>
+      </div>
+      <div class="footer-actions" style="justify-content:center; margin-top:30px;">
+        <button class="btn btn-primary" style="min-width:160px; justify-content:center;" onclick="openProfile()">Done</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderSetPickerModal(){
+  const limits = state.settings.pickerLimits;
+  const edit = state.editingSet;
+  const entry = edit && state.currentLog.find(e => e.id === edit.entryId);
+  const set = entry && entry.sets.find(s => s.id === edit.setId);
+  const weights = [];
+  for(let value = limits.weightMin; value <= limits.weightMax + limits.weightStep / 100; value += limits.weightStep) weights.push(Number(value.toFixed(2)));
+  const reps = [];
+  for(let value = limits.repsMin; value <= limits.repsMax; value += limits.repsStep) reps.push(value);
+  const rawWeight = Math.min(limits.weightMax, Math.max(limits.weightMin, set && set.weight !== '' ? set.weight : limits.weightMin));
+  const rawReps = Math.min(limits.repsMax, Math.max(limits.repsMin, set && set.reps !== '' ? set.reps : limits.repsMin));
+  const selectedWeight = Number((limits.weightMin + Math.round((rawWeight - limits.weightMin) / limits.weightStep) * limits.weightStep).toFixed(2));
+  const selectedReps = limits.repsMin + Math.round((rawReps - limits.repsMin) / limits.repsStep) * limits.repsStep;
+  setTimeout(() => initSetPickerWheels(selectedWeight, selectedReps), 0);
+  return `
+    <div class="modal-overlay">
+      <div class="modal set-picker-modal">
+        <h2>Log set</h2>
+        <div class="set-picker-columns">
+          <label class="wheel-label">Weight (lb)<div class="wheel-picker" id="setPickerWeight" onscroll="updatePickerValue('weight', this.scrollTop)"><div class="wheel-spacer"></div>${weights.map(value => `<div class="wheel-option">${value}</div>`).join('')}<div class="wheel-spacer"></div></div></label>
+          <label class="wheel-label">Reps<div class="wheel-picker" id="setPickerReps" onscroll="updatePickerValue('reps', this.scrollTop)"><div class="wheel-spacer"></div>${reps.map(value => `<div class="wheel-option">${value}</div>`).join('')}<div class="wheel-spacer"></div></div></label>
+        </div>
+        <div class="footer-actions"><button class="btn btn-primary" style="flex:1" onclick="saveSetPicker()">Save set</button><button class="btn" onclick="cancelSetPicker()">Cancel</button></div>
+      </div>
+    </div>`;
 }
 
 function renderPickerModal(){
@@ -1430,21 +1603,30 @@ function renderRoutinesModal(){
 
 function renderNewRoutineModal(){
   const isEdit = Boolean(state.editingRoutineId);
-  const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+  const query = state.routineSearch.trim().toLowerCase();
+  const selected = state.newRoutineExIds.map(id => state.exercises.find(ex => ex.id === id)).filter(Boolean);
+  const remaining = state.exercises
+    .filter(ex => !state.newRoutineExIds.includes(ex.id))
+    .filter(ex => !query || ex.name.toLowerCase().includes(query) || (ex.tagIds || []).some(tid => tagName(tid).toLowerCase().includes(query)))
+    .sort((a,b) => a.name.localeCompare(b.name));
+  const exerciseRow = ex => `
+    <div class="list-item" onclick="toggleRoutineEx('${ex.id}')">
+      <span>${escapeHtml(ex.name)}</span>
+      <input type="checkbox" ${state.newRoutineExIds.includes(ex.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleRoutineEx('${ex.id}')">
+    </div>`;
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h2>${isEdit ? 'Edit Workout Bundle' : 'Create Workout Bundle'}</h2>
         <label>Bundle Name</label>
         <input type="text" id="routineNameInput" placeholder="e.g. Push Day, Leg Day" value="${escapeAttr(state.newRoutineName)}" oninput="state.newRoutineName = this.value">
-        <label>Select Exercises</label>
+        <label>Search exercises</label>
+        <input type="text" id="routineSearchInput" placeholder="Search workout or tag name..." value="${escapeAttr(state.routineSearch)}" oninput="setRoutineSearch(this.value)">
+        <label>Selected (${selected.length})</label>
         <div style="flex:1; overflow-y:auto; margin-bottom:12px;">
-          ${sorted.map(ex => `
-            <div class="list-item" onclick="toggleRoutineEx('${ex.id}')">
-              <span>${escapeHtml(ex.name)}</span>
-              <input type="checkbox" ${state.newRoutineExIds.includes(ex.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleRoutineEx('${ex.id}')">
-            </div>
-          `).join('')}
+          <div class="routine-selected-list">${selected.map(exerciseRow).join('') || '<div class="empty">No workouts selected yet.</div>'}</div>
+          <label class="routine-all-label">All workouts</label>
+          ${remaining.map(exerciseRow).join('') || '<div class="empty">No matching workouts found.</div>'}
         </div>
         <div class="footer-actions">
           <button class="btn btn-primary" style="flex:1;" onclick="saveRoutine()">${isEdit ? 'Save Changes' : 'Save Preset'}</button>
@@ -1540,6 +1722,15 @@ async function handleImportFile(file){
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return escapeHtml(s); }
+
+function syncMobileViewport(){
+  if(window.visualViewport){
+    document.documentElement.style.setProperty('--app-viewport-height', `${window.visualViewport.height}px`);
+  }
+}
+
+syncMobileViewport();
+if(window.visualViewport) window.visualViewport.addEventListener('resize', syncMobileViewport);
 
 loadAll();
 
