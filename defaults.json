@@ -1,13 +1,5 @@
 {
   "version": "1.0.0",
-  "pickerLimits": {
-    "weightMin": 5,
-    "weightMax": 1000,
-    "weightStep": 5,
-    "repsMin": 1,
-    "repsMax": 1000,
-    "repsStep": 1
-  },
   "exercises": [
     {
       "id": "bench-press",

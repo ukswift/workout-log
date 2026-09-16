@@ -20,6 +20,11 @@
     --accent:#0c447c; --accent-bg:#e6f1fb; --danger:#d32f2f; --danger-bg:#fcebeb;
     --success:#2e7d32; --success-bg:#e8f5e9;
     --radius:12px;
+    --card-gap: 12px;
+    --wheel-item-height: 44px;
+    --wheel-picker-height: 220px;
+    --wheel-center-offset: 132px;
+    --wheel-scroll-margin: 88px;
   }
   *{
     box-sizing:border-box; 
@@ -77,7 +82,7 @@
   .routine-selected-list{border:1px solid var(--accent); border-radius:10px; overflow:hidden; margin-bottom:12px;}
   .routine-all-label{margin-top:8px;}
   
-  #log-list { display: flex; flex-direction: column; gap: 12px; }
+  #log-list { display: flex; flex-direction: column; gap: var(--card-gap); }
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
     padding:12px 14px; margin-bottom:0; transition: transform 0.15s ease, opacity 0.15s ease;
@@ -366,10 +371,10 @@
   .day-actions-modal{height:auto; border-radius:20px 20px 0 0; padding:20px;}
   .set-picker-columns{display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0 20px; flex:1; overflow:hidden;}
   .wheel-label{margin:0!important; text-align:center;}
-  .wheel-picker{height:220px; overflow-y:auto; scroll-snap-type:y mandatory; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; background:linear-gradient(to bottom, transparent 88px, var(--accent-bg) 88px, var(--accent-bg) 132px, transparent 132px); mask-image:linear-gradient(transparent, #000 25%, #000 75%, transparent);}
+  .wheel-picker{height:var(--wheel-picker-height); overflow-y:auto; scroll-snap-type:y mandatory; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; background:linear-gradient(to bottom, transparent var(--wheel-scroll-margin), var(--accent-bg) var(--wheel-scroll-margin), var(--accent-bg) var(--wheel-center-offset), transparent var(--wheel-center-offset)); mask-image:linear-gradient(transparent, #000 25%, #000 75%, transparent);}
   .wheel-picker::-webkit-scrollbar{display:none;}
-  .wheel-option{height:44px; scroll-snap-align:center; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--text-secondary);}
-  .wheel-spacer{height:88px; flex:none;}
+  .wheel-option{height:var(--wheel-item-height); scroll-snap-align:center; display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--text-secondary);}
+  .wheel-spacer{height:var(--wheel-scroll-margin); flex:none;}
 
   .action-footer{
     flex-shrink: 0;
@@ -390,7 +395,34 @@
 </div>
 
 <script>
-const APP_VERSION = "0.0.2";
+// ============ CONFIG & CONSTANTS ============
+const APP_VERSION = "1.0.0";
+
+const PICKER_LIMITS = {
+  weightMin: 5,
+  weightMax: 1000,
+  weightStep: 5,
+  repsMin: 1,
+  repsMax: 1000,
+  repsStep: 1,
+};
+
+const UI_CONSTANTS = {
+  cardGapPx: 12,
+  wheelItemHeightPx: 44,
+  wheelPickerHeightPx: 220,
+  wheelCenterOffsetPx: 132,
+  undoStackMaxSize: 20,
+  scrollTopMarginPx: 88,
+};
+
+const STORAGE_PREFIX = "workoutlog:";
+const STORAGE_KEYS = {
+  state: "workoutlog_state",
+  version: "workoutlog_version",
+};
+
+// ============ UTILITIES ============
 const $ = sel => document.querySelector(sel);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
@@ -429,8 +461,8 @@ let state = {
   newRoutineExIds: [],
   routineSearch: '',
   routineCancelTarget: 'routines',
-  settings: { showTags: false, pickerLimits: { weightMin: 0.25, weightMax: 1000, weightStep: 5, repsMin: 1, repsMax: 1000, repsStep: 1 } },
-  pickerSelection: { weight: 0.25, reps: 1 }
+  settings: { showTags: false, pickerLimits: PICKER_LIMITS },
+  pickerSelection: { weight: PICKER_LIMITS.weightMin, reps: PICKER_LIMITS.repsMin }
 };
 
 let historyStack = [];
@@ -439,7 +471,7 @@ let dragTargetIndex = null;
 
 function pushHistory() {
   historyStack.push(JSON.stringify(state.currentLog));
-  if (historyStack.length > 20) historyStack.shift();
+  if (historyStack.length > UI_CONSTANTS.undoStackMaxSize) historyStack.shift();
 }
 
 function undo() {
@@ -452,7 +484,6 @@ function undo() {
 }
 
 const memStorage = {};
-const STORAGE_PREFIX = 'workoutlog:';
 
 async function safeGet(key){
   try{
@@ -1353,7 +1384,7 @@ async function saveSetPicker(){
 
 function updatePickerValue(kind, scrollTop){
   const limits = state.settings.pickerLimits;
-  const index = Math.round(scrollTop / 44);
+  const index = Math.round(scrollTop / UI_CONSTANTS.wheelItemHeightPx);
   state.pickerSelection[kind] = kind === 'weight'
     ? Number((limits.weightMin + index * limits.weightStep).toFixed(2))
     : limits.repsMin + index * limits.repsStep;
@@ -1364,8 +1395,8 @@ function initSetPickerWheels(weight, reps){
   const limits = state.settings.pickerLimits;
   const weightWheel = $('#setPickerWeight');
   const repsWheel = $('#setPickerReps');
-  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * 44;
-  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * 44;
+  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * UI_CONSTANTS.wheelItemHeightPx;
+  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * UI_CONSTANTS.wheelItemHeightPx;
 }
 
 async function cancelSetPicker(){
