@@ -419,7 +419,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.10";
+const APP_VERSION = "1.0.11";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -1692,6 +1692,10 @@ function renderExerciseDetailsModal(){
 function renderProfileModal(){
   return `
     <div class="fullscreen-panel">
+      <div class="row" style="margin-bottom:0;">
+        <div></div>
+        <button class="icon-btn details-close-btn" onclick="closeModal()" title="Close" aria-label="Close">&times;</button>
+      </div>
       <div class="profile-header">
         <div class="profile-avatar">${personIconSvg}</div>
         <div class="profile-name">Me</div>
@@ -1711,9 +1715,6 @@ function renderProfileModal(){
         <h3>Source</h3>
         <a class="profile-link" href="https://github.com/ukswift/workout-log" target="_blank" rel="noopener">github.com/ukswift/workout-log</a>
       </div>
-      <div class="footer-actions" style="justify-content:center; margin-top:30px;">
-        <button class="btn btn-primary" style="min-width:160px; justify-content:center;" onclick="closeModal()">OK</button>
-      </div>
     </div>
   `;
 }
@@ -1721,7 +1722,10 @@ function renderProfileModal(){
 function renderSettingsModal(){
   return `
     <div class="fullscreen-panel">
-      <h2 style="margin:0 0 24px;">Settings</h2>
+      <div class="row" style="margin-bottom:16px;">
+        <h2 style="margin:0;">Settings</h2>
+        <button class="icon-btn details-close-btn" onclick="openProfile()" title="Close" aria-label="Close">&times;</button>
+      </div>
       <div class="profile-section">
         <div class="settings-group-title">Display</div>
         <div class="settings-group">
@@ -1748,9 +1752,6 @@ function renderSettingsModal(){
         <div class="settings-group">
           <div class="setting-field"><label for="chartRangeSetting">Default chart range</label><select id="chartRangeSetting" onchange="updateSetting('chartRange', this.value)" style="padding:9px; border:1px solid var(--border-strong); border-radius:8px; background:var(--card); color:var(--text);"><option value="1w" ${state.settings.chartRange==='1w'?'selected':''}>1 week</option><option value="1m" ${state.settings.chartRange==='1m'?'selected':''}>1 month</option><option value="3m" ${state.settings.chartRange==='3m'?'selected':''}>3 months</option><option value="6m" ${state.settings.chartRange==='6m'?'selected':''}>6 months</option><option value="1y" ${state.settings.chartRange==='1y'?'selected':''}>1 year</option><option value="5y" ${state.settings.chartRange==='5y'?'selected':''}>5 years</option><option value="all" ${(!state.settings.chartRange || state.settings.chartRange==='all')?'selected':''}>All time</option></select></div>
         </div>
-      </div>
-      <div class="footer-actions" style="justify-content:center; margin-top:30px;">
-        <button class="btn btn-primary" style="min-width:160px; justify-content:center;" onclick="openProfile()">Done</button>
       </div>
     </div>
   `;
