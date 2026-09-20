@@ -48,7 +48,7 @@
     padding:0;
     display:flex;
     flex-direction:column;
-    height:100dvh;
+    height:var(--app-viewport-height, 100dvh);
     padding-top:env(safe-area-inset-top);
     padding-left:env(safe-area-inset-left);
     padding-right:env(safe-area-inset-right);
@@ -56,7 +56,7 @@
   #log-list {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 14px 60px 14px;
+    padding: 16px 14px calc(var(--action-footer-height, 60px) + 16px) 14px;
   }
   h1{font-size:20px; font-weight:700; margin:0;}
   .row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
@@ -380,15 +380,15 @@
   .action-footer{
     flex-shrink: 0;
     background: var(--bg);
-    padding: 12px 14px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding: 4px 14px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     z-index: 50;
   }
   .center-action-area{
     display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;
   }
-  .compact-action-footer{padding-top:8px; padding-bottom:calc(8px + env(safe-area-inset-bottom));}
+  .compact-action-footer{padding:0;}
   .compact-action-footer .btn{min-height:40px; padding:8px 14px; font-size:14px;}
   .info-btn{color:var(--accent); border:1px solid var(--accent-bg); background:var(--accent-bg); font-weight:700;}
   .details-close-btn{width:48px; height:48px; min-width:48px; min-height:48px; padding:0; color:var(--text); border:1px solid var(--border-strong); background:var(--card); font-size:30px; line-height:1;}
@@ -415,7 +415,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.5";
+const APP_VERSION = "1.0.6";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -1193,6 +1193,7 @@ function render(){
     }
     setupTouchNavigation();
     setupCalendarSwipe();
+    syncActionFooterHeight();
   });
 }
 
@@ -2100,8 +2101,16 @@ function syncMobileViewport(){
   }
 }
 
+function syncActionFooterHeight(){
+  const footer = document.querySelector('.action-footer');
+  if(footer) document.documentElement.style.setProperty('--action-footer-height', `${footer.getBoundingClientRect().height}px`);
+}
+
 syncMobileViewport();
-if(window.visualViewport) window.visualViewport.addEventListener('resize', syncMobileViewport);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', () => {
+  syncMobileViewport();
+  syncActionFooterHeight();
+});
 
 loadAll();
 
