@@ -90,17 +90,17 @@ WorkoutLog uses **semantic versioning** (MAJOR.MINOR.PATCH):
 2. Commit the version changes with a release message.
 3. Create a git tag: `git tag v1.2.3 && git push origin v1.2.3`
 
-The canonical version is stored in `package.json`; the bump script synchronizes the app and README display versions. This repository includes a tracked `.githooks/pre-push` hook. Enable it once per clone with:
+The canonical version is stored in `package.json`; the bump script synchronizes the app and README display versions. This repository includes a tracked `.githooks/pre-commit` hook. Enable it once per clone with:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-On push, the hook creates a patch-version commit and stops the push so the new commit can be pushed explicitly. To skip that automatic bump for one push, use `WORKOUTLOG_SKIP_VERSION_BUMP=1 git push`.
+Before each commit, the hook creates the next patch version and stages the synchronized version files into that same commit. To skip the automatic bump for one commit, use `WORKOUTLOG_SKIP_VERSION_BUMP=1 git commit`.
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.2
+### Current version: 1.0.3
 
 ## Local development
 

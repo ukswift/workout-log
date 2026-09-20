@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+root_dir=$(git rev-parse --show-toplevel)
+cd "$root_dir"
+
+if [ "${WORKOUTLOG_SKIP_VERSION_BUMP:-}" = "1" ]; then
+  exit 0
+fi
+
+node scripts/bump-version.js patch
+git add package.json index.html README.md
