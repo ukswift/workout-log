@@ -419,7 +419,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.7";
+const APP_VERSION = "1.0.10";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -674,11 +674,13 @@ document.addEventListener('pointerdown', async (e) => {
 
 async function changeDate(delta){
   triggerHaptic();
-  const d = new Date(state.currentDate + "T00:00:00");
-  d.setDate(d.getDate()+delta);
-  state.currentDate = fmtDate(d);
-  await loadLogForDate(state.currentDate);
-  render();
+  await slideView('#log-list', delta, async () => {
+    const d = new Date(state.currentDate + "T00:00:00");
+    d.setDate(d.getDate()+delta);
+    state.currentDate = fmtDate(d);
+    await loadLogForDate(state.currentDate);
+    render();
+  });
 }
 
 function setupTouchNavigation(){
@@ -699,6 +701,33 @@ function setupTouchNavigation(){
   }, {passive:true});
 }
 
+let viewTransitionBusy = false;
+
+async function slideView(selector, delta, update){
+  if(viewTransitionBusy) return;
+  viewTransitionBusy = true;
+  const outgoing = document.querySelector(selector);
+  const outX = delta > 0 ? -100 : 100;
+  try {
+    if(outgoing && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      await outgoing.animate(
+        [{transform:'translateX(0)'}, {transform:`translateX(${outX}%)`}],
+        {duration:140, easing:'ease-in', fill:'forwards'}
+      ).finished;
+    }
+    await update();
+    const incoming = document.querySelector(selector);
+    if(incoming && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      incoming.animate(
+        [{transform:`translateX(${-outX}%)`}, {transform:'translateX(0)'}],
+        {duration:140, easing:'ease-out'}
+      );
+    }
+  } finally {
+    viewTransitionBusy = false;
+  }
+}
+
 async function loadCalendarMonthLogs(){
   const displayDate = state.calendarViewDate || state.currentDate;
   const date = new Date(displayDate + 'T00:00:00');
@@ -715,11 +744,13 @@ async function loadCalendarMonthLogs(){
 }
 
 async function changeCalendarMonth(delta){
-  const d = new Date((state.calendarViewDate || state.currentDate) + 'T00:00:00');
-  d.setMonth(d.getMonth() + delta);
-  state.calendarViewDate = fmtDate(d);
-  await loadCalendarMonthLogs();
-  render();
+  await slideView('[data-calendar-swipe]', delta, async () => {
+    const d = new Date((state.calendarViewDate || state.currentDate) + 'T00:00:00');
+    d.setMonth(d.getMonth() + delta);
+    state.calendarViewDate = fmtDate(d);
+    await loadCalendarMonthLogs();
+    render();
+  });
 }
 
 function setupCalendarSwipe(){
