@@ -13,6 +13,23 @@ A lightweight, installable workout logger PWA — log exercises, sets, reps and 
 
 ## 🚀 Planned Features & Improvements
 
+### High-impact next steps
+
+Prioritized for the largest phone and gym usability gains relative to implementation effort:
+
+1. [ ] **Rest Timer** — Start a configurable 60/90/120-second timer after saving a set, with pause, reset, background-safe timing, and vibration when complete.
+2. [ ] **One-tap Repeat Set** — Add the previous set again without opening the picker.
+3. [ ] **Screen Wake Lock** — Keep the phone awake while the user is actively logging a workout, and release it when the app is backgrounded or the workout ends.
+4. [ ] **Recent Exercises** — Show the last four to six exercises at the top of the exercise picker.
+5. [ ] **Save Status** — Show a small `Saved`, `Saving...`, or `Saved offline` status so users know their action was recorded.
+6. [ ] **Workout Notes** — Add a short note to a day or exercise for form, pain, or effort observations.
+7. [ ] **Weight Units** — Support lb and kg with one canonical stored value and converted display values.
+8. [ ] **Backup Reminder** — Remind users to export a JSON backup periodically without requiring cloud sync.
+9. [ ] **Clear Empty-day Start** — Show a prominent start-workout action, recent exercises, and presets when a selected day has no logs.
+10. [ ] **Delete Recovery** — Keep the existing undo action highly visible and long enough to recover accidental mobile taps.
+
+Avoid prioritizing cloud sync, social features, leaderboards, voice input, or progress photos until the core logging workflow is faster and more reliable. They add maintenance and privacy complexity without improving the main gym workflow as much as the items above.
+
 ### Core Features
 
 - [ ] **Timezone Selection** — Allow users to select their preferred timezone instead of using device timezone
