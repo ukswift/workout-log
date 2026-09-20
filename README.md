@@ -100,7 +100,7 @@ On push, the hook creates a patch-version commit and stops the push so the new c
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.0
+### Current version: 1.0.1
 
 ## Local development
 

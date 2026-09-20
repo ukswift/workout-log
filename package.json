@@ -1,10 +1,10 @@
 {
-    "name": "workout-log",
-    "private": true,
-    "version": "1.0.0",
-    "scripts": {
-        "version:patch": "node scripts/bump-version.js patch",
-        "version:minor": "node scripts/bump-version.js minor",
-        "version:major": "node scripts/bump-version.js major"
-    }
+  "name": "workout-log",
+  "private": true,
+  "version": "1.0.1",
+  "scripts": {
+    "version:patch": "node scripts/bump-version.js patch",
+    "version:minor": "node scripts/bump-version.js minor",
+    "version:major": "node scripts/bump-version.js major"
+  }
 }
