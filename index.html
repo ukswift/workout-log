@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>WorkoutLog</title>
 <meta name="description" content="A lightweight, installable workout logger — log exercises, sets, reps and weight with zero friction.">
 <link rel="manifest" href="manifest.json">
@@ -138,11 +138,6 @@
   }
   
   .sets-line{font-size:14px; color:var(--text-secondary); margin-top:8px; line-height:1.8; display:flex; flex-wrap:wrap; align-items:center; gap:8px;}
-  .set-chip{
-    display:inline-flex; align-items:center; background:var(--bg); border:1px solid var(--border-strong);
-    border-radius:8px; padding:6px 12px; font-size:14px; font-weight:500; cursor:pointer; min-height:36px;
-  }
-  .set-chip:active{transform: scale(0.96); opacity:0.7;}
   .set-tiles{display:flex; gap:6px; width:100%; overflow-x:auto; overflow-y:hidden; padding:2px 0 4px; -webkit-overflow-scrolling:touch; scroll-snap-type:x proximity;}
   .set-pill{
     display:inline-flex; align-items:center; justify-content:center;
@@ -194,6 +189,15 @@
   }
 
   .empty{text-align:center; color:var(--text-muted); padding:36px 20px; font-size:15px;}
+  .tip-banner{
+    display:flex; align-items:center; gap:10px; background:var(--accent-bg); color:var(--text);
+    border-radius:10px; padding:10px 12px; margin-bottom:12px; font-size:13.5px; line-height:1.4;
+  }
+  .tip-banner span.tip-text{flex:1;}
+  .tip-banner button{
+    border:none; background:transparent; color:var(--text-muted); font-size:18px; line-height:1;
+    padding:6px; min-width:32px; min-height:32px; cursor:pointer; flex-shrink:0;
+  }
   
   /* Fullscreen Modal & Notch Safe Area fixes */
   .modal-overlay{
@@ -406,7 +410,6 @@
   .compact-action-footer .btn{min-height:50px; padding:11px 18px; font-size:16px;}
   .info-btn{color:var(--accent); border:1px solid var(--accent-bg); background:var(--accent-bg); font-weight:700;}
   .details-close-btn{width:48px; height:48px; min-width:48px; min-height:48px; padding:0; color:var(--text); border:1px solid var(--border-strong); background:var(--card); font-size:30px; line-height:1;}
-  .chart-panel{padding:0 20px 20px; overflow-y:auto; flex:1;}
   .chart-wrap{height:260px; position:relative; margin:8px 0 20px;}
   .chart-ranges{display:flex; gap:6px; overflow-x:auto; padding:0 0 4px; margin-bottom:10px;}
   .chart-range{border:1px solid var(--border); background:var(--card); color:var(--text-secondary); border-radius:999px; padding:7px 12px; font-size:13px; white-space:nowrap;}
@@ -429,7 +432,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.12";
+const APP_VERSION = "1.0.13";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -495,7 +498,7 @@ let state = {
   newRoutineExIds: [],
   routineSearch: '',
   routineCancelTarget: 'routines',
-  settings: { showTags: false, chartRange: 'all', pickerLimits: PICKER_LIMITS },
+  settings: { showTags: false, chartRange: 'all', pickerLimits: PICKER_LIMITS, tipsDismissed: {} },
   detailExerciseId: null,
   detailRange: null,
   detailChart: null,
@@ -522,12 +525,16 @@ function undo() {
 }
 
 const memStorage = {};
+let storageWarningShown = false;
 
 async function safeGet(key){
   try{
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
     if (raw !== null) return JSON.parse(raw);
-  }catch(e){ console.warn("localStorage get failed, using in-memory fallback", e); }
+  }catch(e){
+    console.warn("localStorage get failed, using in-memory fallback", e);
+    if(!storageWarningShown){ storageWarningShown = true; showToast("Storage unavailable — using temporary memory for this session", false); }
+  }
   return memStorage[key] ? JSON.parse(memStorage[key]) : null;
 }
 
@@ -609,6 +616,7 @@ async function loadDefaults(){
     }
   } catch (e) {
     console.warn('Failed to load defaults:', e);
+    showToast('Could not load starter workouts — check your connection', false);
   }
 }
 
@@ -663,7 +671,7 @@ document.addEventListener('pointerdown', async (e) => {
   const isClickOnFooter = e.target.closest('.action-footer');
   const isClickOnModal = e.target.closest('.modal-overlay');
 
-  if (container && !container.contains(e.target) && !e.target.closest('.add-set-icon-btn') && !e.target.closest('.set-chip') && !isClickOnFooter && !isClickOnModal) {
+  if (container && !container.contains(e.target) && !e.target.closest('.add-set-icon-btn') && !e.target.closest('.set-pill') && !isClickOnFooter && !isClickOnModal) {
     const entry = state.currentLog.find(item => item.id === state.editingSet.entryId);
     if (entry) {
       if (state.editingSet.isNew) {
@@ -859,6 +867,8 @@ function closeModal(){
   state.newExName=""; 
   state.newExTags=[]; 
   state.tagInputQuery="";
+  state.formError=null;
+  state.formErrorExerciseId=null;
   render(); 
 }
 
@@ -868,6 +878,7 @@ function openCreateFromSearch(initialName){
   state.newExTags=[];
   state.tagInputQuery="";
   state.formError=null;
+  state.formErrorExerciseId=null;
   render();
   requestAnimationFrame(() => {
     renderTagOptions();
@@ -881,12 +892,19 @@ function isExerciseNameExists(name) {
   return state.exercises.some(ex => ex.name.trim().toLowerCase() === normalizedName);
 }
 
+function findExerciseByName(name) {
+  const normalizedName = name.trim().toLowerCase();
+  return state.exercises.find(ex => ex.name.trim().toLowerCase() === normalizedName);
+}
+
 async function saveNewExercise(){
   const name = $('#newExNameInput') ? $('#newExNameInput').value.trim() : "";
-  if(!name){ state.formError="Enter a name"; render(); return; }
+  if(!name){ state.formError="Enter a name"; state.formErrorExerciseId=null; render(); return; }
 
-  if (isExerciseNameExists(name)) {
+  const existing = findExerciseByName(name);
+  if (existing) {
     state.formError=`Workout "${name}" already exists`;
+    state.formErrorExerciseId = existing.id;
     render();
     return;
   }
@@ -901,6 +919,7 @@ async function saveNewExercise(){
   state.currentLog.push(entry);
   
   state.formError=null;
+  state.formErrorExerciseId=null;
   state.modal=null;
   state.editingSet = {
     entryId: entry.id, 
@@ -1082,6 +1101,7 @@ function renderDatePicker(){
       <div class="modal" style="max-width:320px;">
         <div class="calendar-swipe-area" data-calendar-swipe>
         <h2 style="margin:0 0 16px; text-align:center;">${monthName}</h2>
+        ${renderTipBanner('calendar', 'Tip: swipe left/right to change month.')}
         <div style="display:flex; gap:8px; margin-bottom:12px; justify-content:center;">
           <button class="btn btn-sm" onclick="changeCalendarMonth(-1)">← Prev</button>
           <button class="btn btn-sm btn-primary" onclick="goToToday()">Today</button>
@@ -1164,11 +1184,11 @@ async function saveRoutine(){
   const nameInput = $('#routineNameInput');
   const name = nameInput ? nameInput.value.trim() : state.newRoutineName.trim();
   if(!name) {
-    alert("Please enter a name for the preset bundle.");
+    alert("Please enter a name for the preset.");
     return;
   }
   if(state.newRoutineExIds.length === 0) {
-    alert("Please select at least one workout for the preset bundle.");
+    alert("Please select at least one workout for the preset.");
     return;
   }
   
@@ -1178,11 +1198,11 @@ async function saveRoutine(){
       r.name = name;
       r.exerciseIds = [...state.newRoutineExIds];
     }
-    showToast("Preset bundle updated", false);
+    showToast("Preset updated", false);
   } else {
     const routine = { id: uid(), name, exerciseIds: [...state.newRoutineExIds] };
     state.routines.push(routine);
-    showToast("Preset bundle saved", false);
+    showToast("Preset saved", false);
   }
 
   await safeSet('routines', state.routines);
@@ -1192,6 +1212,8 @@ async function saveRoutine(){
 }
 
 async function deleteRoutine(rId){
+  const r = state.routines.find(x => x.id === rId);
+  if(!confirm(`Delete preset "${r ? r.name : ''}"? This can't be undone.`)) return;
   state.routines = state.routines.filter(r => r.id !== rId);
   await safeSet('routines', state.routines);
   render();
@@ -1211,7 +1233,7 @@ async function applyRoutine(routine){
   }
   state.modal = null;
   render();
-  showToast(`Added routine "${routine.name}"`);
+  showToast(`Added preset "${routine.name}"`);
   await saveCurrentLog();
 }
 
@@ -1263,6 +1285,17 @@ function openDayActions(){ state.modal='dayActions'; render(); }
 
 async function updateSetting(key, enabled){
   state.settings[key] = enabled;
+  await safeSet('settings', state.settings);
+  render();
+}
+
+function renderTipBanner(key, text){
+  if(state.settings.tipsDismissed && state.settings.tipsDismissed[key]) return '';
+  return `<div class="tip-banner"><span class="tip-text">${text}</span><button onclick="dismissTip('${key}')" title="Dismiss tip" aria-label="Dismiss tip">&times;</button></div>`;
+}
+
+async function dismissTip(key){
+  state.settings.tipsDismissed = { ...state.settings.tipsDismissed, [key]: true };
   await safeSet('settings', state.settings);
   render();
 }
@@ -1391,6 +1424,8 @@ function renderLogListContent(){
     `;
   }
 
+  const tipBanner = renderTipBanner('log', 'Tip: swipe left/right to switch days, tap a set to edit it, and long-press a set to reorder it.');
+
   let cardsHtml = state.currentLog.map((entry, index) => {
     const ex = state.exercises.find(e=>e.id===entry.exerciseId);
     const name = ex ? ex.name : "(deleted workout)";
@@ -1440,7 +1475,7 @@ function renderLogListContent(){
            ondragend="handleDragEnd(event)">
         <div class="card-header">
           <div class="header-left">
-            <span class="drag-handle" title="Drag to reorder" onpointerdown="this.closest('.card').draggable=true" onpointerup="this.closest('.card').draggable=false">≡</span>
+            <span class="drag-handle" role="button" tabindex="0" title="Drag to reorder" aria-label="Drag to reorder" onpointerdown="this.closest('.card').draggable=true" onpointerup="this.closest('.card').draggable=false">≡</span>
             <span class="ex-name">${escapeHtml(name)}</span>
             ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
           </div>
@@ -1458,7 +1493,7 @@ function renderLogListContent(){
     cardsHtml = `<div class="empty">No workouts logged for this day.</div>`;
   }
 
-  return cardsHtml;
+  return tipBanner + cardsHtml;
 }
 
 function renderActionFooter(){
@@ -1924,6 +1959,8 @@ function openEditExercise(exId){
   state.newExName = ex.name;
   state.newExTags = ex.tagIds ? [...ex.tagIds] : [];
   state.tagInputQuery = "";
+  state.formError=null;
+  state.formErrorExerciseId=null;
   render();
 }
 
@@ -1954,6 +1991,8 @@ async function saveEditExercise(){
 }
 
 async function deleteExercise(exId){
+  const ex = state.exercises.find(e=>e.id===exId);
+  if(!confirm(`Delete "${ex ? ex.name : 'this workout'}"? Its past logged history will stay, but it will no longer show up in pickers or presets.`)) return;
   state.exercises = state.exercises.filter(e=>e.id!==exId);
   render();
   showToast("Workout deleted", false);
@@ -1975,7 +2014,7 @@ function renderNewExerciseModal(){
         <h2>${isEdit ? 'Edit workout' : 'New workout'}</h2>
         <label>Name</label>
         <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
-        ${state.formError ? `<div class="error">${state.formError}</div>` : ''}
+        ${state.formError ? `<div class="error">${state.formError}${state.formErrorExerciseId ? ` &mdash; <a href="#" onclick="event.preventDefault(); addExerciseToLog('${state.formErrorExerciseId}');">Use existing</a>` : ''}</div>` : ''}
         
         <label>Tags (type to search or create)</label>
         <div class="tag-field-container">
@@ -2035,7 +2074,7 @@ function renderRoutinesModal(){
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>Workout Presets (Bundles)</h2>
+        <h2>Presets</h2>
         <div style="flex:1; overflow-y:auto;">
           ${state.routines.length === 0 ? `<div class="empty">No presets created yet (e.g., Push Day, Leg Day).</div>` : ''}
           ${state.routines.map(r => `
@@ -2051,14 +2090,14 @@ function renderRoutinesModal(){
               </div>
               <div style="display:flex; gap:4px; align-items:center;">
                 <button class="btn btn-sm btn-primary" onclick="applyRoutine(state.routines.find(x=>x.id==='${r.id}'))">Add</button>
-                <button class="icon-btn" onclick="openEditRoutineModal('${r.id}')" title="Edit routine" aria-label="Edit routine">${editIconSvg}</button>
-                <button class="icon-btn danger" onclick="deleteRoutine('${r.id}')" title="Delete routine" aria-label="Delete routine">${trashIconSvg}</button>
+                <button class="icon-btn" onclick="openEditRoutineModal('${r.id}')" title="Edit preset" aria-label="Edit preset">${editIconSvg}</button>
+                <button class="icon-btn danger" onclick="deleteRoutine('${r.id}')" title="Delete preset" aria-label="Delete preset">${trashIconSvg}</button>
               </div>
             </div>
           `).join('')}
         </div>
         <div class="footer-actions">
-          <button class="btn btn-primary" style="flex:1;" onclick="openNewRoutineModal()">+ Create Preset Bundle</button>
+          <button class="btn btn-primary" style="flex:1;" onclick="openNewRoutineModal()">+ Create preset</button>
           <button class="btn" onclick="closeModal()">Close</button>
         </div>
       </div>
@@ -2082,8 +2121,8 @@ function renderNewRoutineModal(){
   return `
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
-        <h2>${isEdit ? 'Edit Workout Bundle' : 'Create Workout Bundle'}</h2>
-        <label>Bundle Name</label>
+        <h2>${isEdit ? 'Edit preset' : 'Create preset'}</h2>
+        <label>Preset name</label>
         <input type="text" id="routineNameInput" placeholder="e.g. Push Day, Leg Day" value="${escapeAttr(state.newRoutineName)}" oninput="state.newRoutineName = this.value">
         <label>Search exercises</label>
         <input type="text" id="routineSearchInput" placeholder="Search workout or tag name..." value="${escapeAttr(state.routineSearch)}" oninput="setRoutineSearch(this.value)">
@@ -2214,6 +2253,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then((registration) => registration.update()).catch((e) => {
       console.warn('Service worker registration failed', e);
+      showToast("Offline support couldn't be enabled", false);
     });
   });
 }
