@@ -412,6 +412,21 @@
   .details-close-btn{width:48px; height:48px; min-width:48px; min-height:48px; padding:0; color:var(--text); border:1px solid var(--border-strong); background:var(--card); font-size:30px; line-height:1;}
   .chart-wrap{height:260px; position:relative; margin:8px 0 20px;}
   .chart-wrap.rep-chart{height:300px;}
+  .onboarding-tour{position:fixed; inset:0; z-index:10000; pointer-events:none;}
+  .onboarding-shade{position:fixed; background:rgba(12,20,29,.68); pointer-events:auto;}
+  .onboarding-spotlight{position:fixed; border:2px solid #fff; border-radius:10px; background:transparent; box-shadow:0 0 0 3px var(--accent); pointer-events:auto; transition:top .18s ease,left .18s ease,width .18s ease,height .18s ease;}
+  .onboarding-card{position:fixed; width:min(340px,calc(100vw - 32px)); background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:0 12px 36px rgba(0,0,0,.24); pointer-events:auto;}
+  .onboarding-step-count{font-size:12px; font-weight:700; color:var(--accent); text-transform:uppercase; margin-bottom:6px;}
+  .onboarding-card h2{font-size:18px; margin:0 0 6px;}
+  .onboarding-card p{font-size:14px; line-height:1.45; margin:0; color:var(--text-secondary);}
+  .onboarding-actions{display:flex; align-items:center; gap:8px; margin-top:14px;}
+  .onboarding-actions .spacer{flex:1;}
+  .onboarding-actions .btn{min-height:38px; padding:8px 12px;}
+  .onboarding-choice-backdrop{position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,.55); display:grid; place-items:center; padding:16px;}
+  .onboarding-choice{width:min(400px,100%); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; box-shadow:0 12px 36px rgba(0,0,0,.24);}
+  .onboarding-choice h2{font-size:19px; margin:0 0 8px;}
+  .onboarding-choice p{font-size:14px; color:var(--text-secondary); margin:0 0 16px;}
+  .onboarding-choice .btn{width:100%; justify-content:center; margin-top:8px;}
   .chart-ranges{display:flex; gap:6px; overflow-x:auto; padding:0 0 4px; margin-bottom:10px;}
   .chart-range{border:1px solid var(--border); background:var(--card); color:var(--text-secondary); border-radius:999px; padding:7px 12px; font-size:13px; white-space:nowrap;}
   .chart-range.active{background:var(--accent); border-color:var(--accent); color:#fff;}
@@ -433,7 +448,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.16";
+const APP_VERSION = "1.0.17";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -506,6 +521,12 @@ let state = {
   detailChart: null,
   detailRepChart: null,
   calendarViewDate: null,
+  onboardingActive: false,
+  onboardingStep: 0,
+  onboardingCompleted: false,
+  onboardingDemoActive: false,
+  onboardingReplayActive: false,
+  onboardingFinishPrompt: false,
   pickerSelection: { weight: PICKER_LIMITS.weightMin, reps: PICKER_LIMITS.repsMin }
 };
 
@@ -554,6 +575,38 @@ async function safeSet(key, value){
   }
 }
 
+async function restoreOnboardingReplay(){
+  const backup = await safeGet('onboardingReplayBackup');
+  if(!backup) return;
+  await safeSet('onboardingReplayRestoring', true);
+  const logPrefix = STORAGE_PREFIX + 'log:';
+  const logKeys = [];
+  for(let index = 0; index < localStorage.length; index++){
+    const key = localStorage.key(index);
+    if(key && key.startsWith(logPrefix)) logKeys.push(key);
+  }
+  logKeys.forEach(key => localStorage.removeItem(key));
+  Object.keys(memStorage).filter(key => key.startsWith('log:')).forEach(key => delete memStorage[key]);
+  for(const [date, entries] of Object.entries(backup.logs || {})) await safeSet('log:'+date, entries);
+  await safeSet('logDates', backup.logDates || []);
+  await safeSet('exercises', backup.exercises || []);
+  await safeSet('tags', backup.tags || []);
+  await safeSet('routines', backup.routines || []);
+  await safeSet('onboardingDemoDates', backup.onboardingDemoDates || []);
+  await safeSet('onboardingDemoActive', Boolean(backup.onboardingDemoActive));
+  localStorage.removeItem(STORAGE_PREFIX + 'onboardingReplayBackup');
+  localStorage.removeItem(STORAGE_PREFIX + 'onboardingReplayRestoring');
+  delete memStorage.onboardingReplayBackup;
+  delete memStorage.onboardingReplayRestoring;
+  state.exercises = backup.exercises || [];
+  state.tags = backup.tags || [];
+  state.routines = backup.routines || [];
+  state.logDates = backup.logDates || [];
+  state.onboardingDemoActive = Boolean(backup.onboardingDemoActive);
+  state.onboardingReplayActive = false;
+  await loadLogForDate(state.currentDate);
+}
+
 async function repairLogDates(){
   const storedDates = new Set(state.logDates);
   const logKeyPrefix = STORAGE_PREFIX + 'log:';
@@ -595,11 +648,22 @@ const personIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12"
 const checkIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg>`;
 
 async function loadAll(){
+  const replayBackup = await safeGet('onboardingReplayBackup');
+  if(replayBackup && await safeGet('onboardingReplayRestoring')) await restoreOnboardingReplay();
+  const replayActive = Boolean(await safeGet('onboardingReplayBackup'));
   state.exercises = (await safeGet('exercises')) || [];
   state.tags = (await safeGet('tags')) || [];
   state.routines = (await safeGet('routines')) || [];
   state.logDates = (await safeGet('logDates')) || [];
   await repairLogDates();
+  const savedDefaultsLoaded = await safeGet('defaultsLoaded');
+  state.onboardingCompleted = Boolean(await safeGet('onboardingCompleted'));
+  state.onboardingDemoActive = replayActive || Boolean(await safeGet('onboardingDemoActive'));
+  state.onboardingReplayActive = replayActive;
+  const hasExistingAppData = Boolean(savedDefaultsLoaded || state.exercises.length || state.tags.length || state.routines.length || state.logDates.length);
+  const startFirstRunTour = !state.onboardingCompleted && !state.onboardingDemoActive && !hasExistingAppData;
+  state.onboardingActive = replayActive || startFirstRunTour || (!state.onboardingCompleted && state.onboardingDemoActive);
+  if(replayActive) state.onboardingStep = 0;
   const savedSettings = await safeGet('settings');
   if(savedSettings) state.settings = { ...state.settings, ...savedSettings, pickerLimits: { ...state.settings.pickerLimits, ...(savedSettings.pickerLimits || {}) } };
   try {
@@ -607,15 +671,64 @@ async function loadAll(){
     if(!savedSettings?.pickerLimits && config.pickerLimits) state.settings.pickerLimits = config.pickerLimits;
   } catch(e) {}
 
-  const defaultsLoaded = await safeGet('defaultsLoaded');
-  if (!defaultsLoaded) {
+  if (!savedDefaultsLoaded) {
     await loadDefaults();
     await safeSet('defaultsLoaded', true);
   }
 
+  if(startFirstRunTour){
+    await seedOnboardingSampleData();
+    state.onboardingDemoActive = true;
+    await safeSet('onboardingDemoActive', true);
+  }
   await loadChartDemoData();
   await loadLogForDate(state.currentDate);
   render();
+}
+
+async function seedOnboardingSampleData(){
+  const exercises = new Map(state.exercises.map(item => [item.id, item]));
+  if(!exercises.size) return;
+  const baseDate = new Date(state.currentDate + 'T00:00:00');
+  const split = [
+    [['bench-press',90],['overhead-press',65],['incline-bench-press',50],['lateral-raises',15],['tricep-pushdowns',35]],
+    [['deadlift',135],['barbell-row',75],['lat-pulldown',80],['face-pulls',30],['barbell-curls',45]],
+    [['squat',115],['leg-press',180],['leg-curl',70],['leg-extension',60]],
+    [['bench-press',90],['dumbbell-bench-press',45],['shoulder-press',35],['cable-flyes',25],['tricep-dips',20]],
+    [['dumbbell-rows',45],['pull-ups',25],['lat-pulldown',80],['face-pulls',30],['dumbbell-curls',25]],
+    [['hack-squat',90],['leg-press',180],['leg-curl',70],['leg-adductor',70]]
+  ];
+  const benchSessions = [
+    {weight:90,reps:[8,8,7]}, {weight:90,reps:[9,8,8]}, {weight:90,reps:[10,9,8]},
+    {weight:90,reps:[11,10,9]}, {weight:90,reps:[12,12,12]}, {weight:95,reps:[8,8,7]}
+  ];
+  const sampleDates = [];
+  for(let index = 0; index < 18; index++){
+    const offset = 20 - index - Math.floor(index / 6) - (index === 17 ? 1 : 0);
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - offset);
+    const dateStr = fmtDate(date);
+    const week = Math.floor(index / 6);
+    const workout = split[index % split.length].flatMap(([exerciseId, baseWeight]) => {
+      if(!exercises.has(exerciseId)) return [];
+      const isBench = exerciseId === 'bench-press';
+      const benchSessionIndex = week * 2 + (index % split.length === 3 ? 1 : 0);
+      const progression = isBench ? benchSessions[benchSessionIndex] : null;
+      const weight = progression ? progression.weight : baseWeight + (week === 2 && baseWeight >= 45 ? 5 : 0);
+      const reps = progression ? progression.reps : [8 + week, 8 + week, 7 + week];
+      return [{
+        id:uid(), exerciseId,
+        sets:reps.map(count => ({id:uid(), reps:count, weight})),
+        updatedAt:new Date().toISOString()
+      }];
+    });
+    await safeSet('log:'+dateStr, workout);
+    if(!state.logDates.includes(dateStr)) state.logDates.push(dateStr);
+    sampleDates.push(dateStr);
+  }
+  state.logDates.sort();
+  await safeSet('logDates', state.logDates);
+  await safeSet('onboardingDemoDates', sampleDates);
 }
 
 async function loadChartDemoData(){
@@ -1296,6 +1409,8 @@ async function applyRoutine(routine){
 }
 
 function render(){
+  document.querySelector('#onboarding-tour')?.remove();
+  document.querySelector('#onboarding-choice')?.remove();
   const app = $('#app');
   const logList = document.querySelector('#log-list');
   const scrollPos = logList ? logList.scrollTop : 0;
@@ -1305,7 +1420,7 @@ function render(){
     <div class="top-bar">
       <div class="header-main">
         <div class="header-brand">
-          <button class="icon-btn" style="border:1px solid var(--border-strong); border-radius:50%; color:var(--text-secondary);" onclick="openProfile()" title="Profile" aria-label="Profile">${personIconSvg}</button>
+          <button class="icon-btn" data-onboarding-target="profile" style="border:1px solid var(--border-strong); border-radius:50%; color:var(--text-secondary);" onclick="openProfile()" title="Profile" aria-label="Profile">${personIconSvg}</button>
           <img src="icons/icon-192.png" alt="" width="28" height="28" style="border-radius:8px; flex-shrink:0;">
           <h1>WorkoutLog</h1>
         </div>
@@ -1313,7 +1428,7 @@ function render(){
           <button class="btn btn-sm" onclick="openDayActions()">More</button>
         </div>
       </div>
-      <div class="date-nav">
+      <div class="date-nav" data-onboarding-target="date">
         <button class="btn-ghost" onclick="changeDate(-1)">&larr;</button>
         <button class="btn-ghost" style="cursor:pointer; padding:4px 12px; border:1px solid var(--border); border-radius:6px; background:transparent; color:inherit; font-size:14px;" onclick="openDatePicker()">${displayDate(state.currentDate)}</button>
         <button class="btn-ghost" onclick="changeDate(1)" ${state.currentDate===fmtDate(new Date())?'style="visibility:hidden"':''}>&rarr;</button>
@@ -1334,6 +1449,10 @@ function render(){
     setupTouchNavigation();
     setupCalendarSwipe();
     syncActionFooterHeight();
+    setTimeout(() => {
+      renderOnboardingTour();
+      renderOnboardingChoice();
+    }, 40);
   });
 }
 
@@ -1352,6 +1471,240 @@ function renderTipBanner(key, text){
   return `<div class="tip-banner"><span class="tip-text">${text}</span><button onclick="dismissTip('${key}')" title="Dismiss tip" aria-label="Dismiss tip">&times;</button></div>`;
 }
 
+const ONBOARDING_STEPS = [
+  {id:'log', target:'[data-onboarding-target="log"]', title:'Log a workout', text:'Start by adding an exercise to today’s workout.'},
+  {id:'choose-existing', target:'[data-onboarding-target="exercise-choice"]', title:'Choose an existing exercise', text:'Pick from the predefined list, search by exercise or tag, or filter by a tag.'},
+  {id:'create-missing', target:'[data-onboarding-target="create-exercise"]', title:'Create an exercise if it is missing', text:'Search for the name first. If it is not in the list, use the Create option to add it.'},
+  {id:'sets', target:'[data-onboarding-target="sets"]', title:'Edit and order sets', text:'Tap a set to edit it. Long-press a set to reorder it, or use the plus button to add another.'},
+  {id:'max-weight', target:'[data-onboarding-target="max-weight-chart"]', title:'Track strength over time', text:'Max Weight shows the heaviest set for this exercise on each workout day, so you can see when the load increases.'},
+  {id:'rep-progression', target:'[data-onboarding-target="rep-progression-chart"]', title:'See every set’s rep progression', text:'Each day is a group, each point is a set, and colors identify weight. Follow reps against the 12-rep target while keeping the load visible.'},
+  {id:'profile-data', target:'[data-onboarding-target="profile-data"]', title:'Backups and fresh start', text:'Use Profile to export a backup or import one. After exploring, clear the sample workout logs to begin fresh.'},
+  {id:'presets', target:'[data-onboarding-target="presets"]', title:'Use presets', text:'Presets let you quickly add a saved group of exercises to a workout.'},
+  {id:'date', target:'[data-onboarding-target="date"]', title:'Browse workout days', text:'Use the arrows or tap the date to move between days. Logged dates are marked in the calendar.'}
+];
+
+async function startOnboardingTour(){
+  if(state.onboardingActive) return;
+  state.modal = null;
+  state.onboardingStep = 0;
+  state.onboardingActive = true;
+  state.onboardingFinishPrompt = false;
+  try{
+    const response = await fetch('./defaults.json');
+    if(!response.ok) throw new Error('Sample data is unavailable');
+    const defaults = await response.json();
+    const logs = {};
+    const logPrefix = STORAGE_PREFIX + 'log:';
+    for(let index = 0; index < localStorage.length; index++){
+      const key = localStorage.key(index);
+      if(!key || !key.startsWith(logPrefix)) continue;
+      try { logs[key.slice(logPrefix.length)] = JSON.parse(localStorage.getItem(key)); } catch(e) {}
+    }
+    for(const [key, value] of Object.entries(memStorage)){
+      if(!key.startsWith('log:')) continue;
+      try { logs[key.slice(4)] = JSON.parse(value); } catch(e) {}
+    }
+    for(const date of state.logDates){
+      if(!(date in logs)) logs[date] = (await safeGet('log:'+date)) || [];
+    }
+    const backup = {
+      exercises:state.exercises,
+      tags:state.tags,
+      routines:state.routines,
+      logs,
+      logDates:state.logDates,
+      onboardingDemoDates:(await safeGet('onboardingDemoDates')) || [],
+      onboardingDemoActive:state.onboardingDemoActive
+    };
+    if(!await safeSet('onboardingReplayBackup', backup)) throw new Error('Could not save a temporary workout backup');
+    const logKeys = [];
+    for(let index = 0; index < localStorage.length; index++){
+      const key = localStorage.key(index);
+      if(key && key.startsWith(logPrefix)) logKeys.push(key);
+    }
+    logKeys.forEach(key => localStorage.removeItem(key));
+    Object.keys(memStorage).filter(key => key.startsWith('log:')).forEach(key => delete memStorage[key]);
+    state.exercises = defaults.exercises || [];
+    state.tags = defaults.tags || [];
+    state.routines = defaults.routines || [];
+    state.logDates = [];
+    state.currentLog = [];
+    await safeSet('exercises', state.exercises);
+    await safeSet('tags', state.tags);
+    await safeSet('routines', state.routines);
+    await safeSet('logDates', []);
+    await safeSet('onboardingDemoDates', []);
+    state.onboardingDemoActive = true;
+    state.onboardingReplayActive = true;
+    await safeSet('onboardingDemoActive', true);
+    await seedOnboardingSampleData();
+    await loadLogForDate(state.currentDate);
+  } catch(error){
+    await restoreOnboardingReplay();
+    state.onboardingActive = false;
+    showToast(error.message || 'Could not start the sample tour', false);
+  }
+  render();
+}
+
+async function finishOnboardingTour(){
+  destroyExerciseDetailCharts();
+  if(state.onboardingReplayActive) await restoreOnboardingReplay();
+  state.onboardingActive = false;
+  state.onboardingCompleted = true;
+  state.modal = null;
+  state.newExName = '';
+  state.newExTags = [];
+  state.tagInputQuery = '';
+  state.onboardingFinishPrompt = state.onboardingDemoActive;
+  await safeSet('onboardingCompleted', true);
+  render();
+}
+
+async function advanceOnboardingTour(){
+  if(state.onboardingStep >= ONBOARDING_STEPS.length - 1){
+    await finishOnboardingTour();
+    return;
+  }
+  const nextStep = ONBOARDING_STEPS[state.onboardingStep + 1];
+  await prepareOnboardingStep(nextStep);
+  state.onboardingStep++;
+  render();
+  if(nextStep.id === 'max-weight' || nextStep.id === 'rep-progression') await loadExerciseDetails();
+}
+
+async function prepareOnboardingStep(step){
+  if(step.id === 'choose-existing'){
+    state.modal = 'picker';
+    state.pickerSearch = '';
+    state.pickerTag = null;
+  } else if(step.id === 'create-missing'){
+    state.modal = 'picker';
+    state.pickerSearch = 'Example Exercise';
+    state.pickerTag = null;
+  } else if(step.id === 'max-weight' || step.id === 'rep-progression'){
+    destroyExerciseDetailCharts();
+    let exerciseId = state.exercises.find(item => item.id === 'bench-press')?.id || state.currentLog[0]?.exerciseId;
+    if(!exerciseId){
+      for(const date of [...state.logDates].reverse()){
+        const entries = (await safeGet('log:'+date)) || [];
+        const entry = entries.find(item => item.sets?.some(set => set.weight !== '' && set.reps !== ''));
+        if(entry){ exerciseId = entry.exerciseId; break; }
+      }
+    }
+    state.detailExerciseId = exerciseId || state.exercises[0]?.id || null;
+    state.detailRange = 'all';
+    state.modal = 'exerciseDetails';
+  } else if(step.id === 'profile-data' || step.id === 'presets'){
+    destroyExerciseDetailCharts();
+    state.modal = 'profile';
+  } else {
+    destroyExerciseDetailCharts();
+    state.modal = null;
+    state.newExName = '';
+    state.newExTags = [];
+    state.tagInputQuery = '';
+  }
+}
+
+function backOnboardingTour(){
+  if(state.onboardingStep === 0) return;
+  const previousStep = ONBOARDING_STEPS[state.onboardingStep - 1];
+  prepareOnboardingStep(previousStep).then(() => {
+    state.onboardingStep--;
+    render();
+    if(previousStep.id === 'max-weight' || previousStep.id === 'rep-progression') loadExerciseDetails();
+  });
+}
+
+function renderOnboardingTour(){
+  document.querySelector('#onboarding-tour')?.remove();
+  if(!state.onboardingActive) return;
+  const step = ONBOARDING_STEPS[state.onboardingStep];
+  let target = document.querySelector(step.target);
+  const setsUnavailable = step.id === 'sets' && !target;
+  if(setsUnavailable) target = document.querySelector('[data-onboarding-target="log"]');
+  if(!target) return;
+  const stepText = setsUnavailable
+    ? 'Once an exercise is in a workout, tap a set to edit it, long-press a completed set to reorder it, or use + to add one. These controls appear after your first exercise.'
+    : step.text;
+  const rect = target.getBoundingClientRect();
+  if(rect.top < 12 || rect.bottom > window.innerHeight - 12) target.scrollIntoView({block:'center', behavior:'instant'});
+  const targetRect = target.getBoundingClientRect();
+  const pad = 7;
+  const top = Math.max(0, targetRect.top - pad);
+  const left = Math.max(0, targetRect.left - pad);
+  const right = Math.min(window.innerWidth, targetRect.right + pad);
+  const bottom = Math.min(window.innerHeight, targetRect.bottom + pad);
+  const tour = document.createElement('div');
+  tour.id = 'onboarding-tour';
+  tour.className = 'onboarding-tour';
+  tour.innerHTML = `
+    <div class="onboarding-shade" style="top:0;left:0;width:100%;height:${top}px"></div>
+    <div class="onboarding-shade" style="top:${top}px;left:0;width:${left}px;height:${bottom-top}px"></div>
+    <div class="onboarding-shade" style="top:${top}px;left:${right}px;width:${Math.max(0,window.innerWidth-right)}px;height:${bottom-top}px"></div>
+    <div class="onboarding-shade" style="top:${bottom}px;left:0;width:100%;height:${Math.max(0,window.innerHeight-bottom)}px"></div>
+    <div class="onboarding-spotlight" style="top:${top}px;left:${left}px;width:${right-left}px;height:${bottom-top}px"></div>
+    <section class="onboarding-card" role="dialog" aria-modal="true" aria-label="${step.title}">
+      <div class="onboarding-step-count">${state.onboardingStep + 1} of ${ONBOARDING_STEPS.length}</div>
+      <h2>${step.title}</h2>
+      <p>${stepText}</p>
+      <div class="onboarding-actions">
+        <button class="btn btn-sm" onclick="finishOnboardingTour()">Skip</button>
+        <span class="spacer"></span>
+        ${state.onboardingStep > 0 ? '<button class="btn btn-sm" onclick="backOnboardingTour()">Back</button>' : ''}
+        <button class="btn btn-sm btn-primary" onclick="advanceOnboardingTour()">${state.onboardingStep === ONBOARDING_STEPS.length - 1 ? 'Done' : 'Next'}</button>
+      </div>
+    </section>`;
+  document.body.append(tour);
+  const card = tour.querySelector('.onboarding-card');
+  const cardWidth = Math.min(340, window.innerWidth - 32);
+  const cardLeft = Math.max(16, Math.min(window.innerWidth - cardWidth - 16, left + (right-left-cardWidth)/2));
+  card.style.left = `${cardLeft}px`;
+  const cardHeight = card.offsetHeight;
+  const cardTop = bottom + cardHeight + 16 <= window.innerHeight ? bottom + 16 : Math.max(16, top - cardHeight - 16);
+  card.style.top = `${cardTop}px`;
+}
+
+function renderOnboardingChoice(){
+  document.querySelector('#onboarding-choice')?.remove();
+  if(!state.onboardingFinishPrompt || !state.onboardingDemoActive) return;
+  const choice = document.createElement('div');
+  choice.id = 'onboarding-choice';
+  choice.className = 'onboarding-choice-backdrop';
+  choice.innerHTML = `<section class="onboarding-choice" role="dialog" aria-modal="true" aria-labelledby="onboarding-choice-title"><h2 id="onboarding-choice-title">What would you like to do?</h2><p>Explore the three weeks of example workouts, or clear workout logs and start with a blank history.</p><button class="btn btn-primary" onclick="continueWithSampleData()">Explore with sample workouts</button><button class="btn" onclick="clearWorkoutLogsAndStartFresh()">Clear logs and start fresh</button></section>`;
+  document.body.append(choice);
+}
+
+function continueWithSampleData(){
+  state.onboardingFinishPrompt = false;
+  render();
+}
+
+async function clearWorkoutLogsAndStartFresh(){
+  if(!confirm('Clear all workout logs on this device and start fresh? Exercises and presets will be kept.')) return;
+  const logPrefix = STORAGE_PREFIX + 'log:';
+  const logKeys = [];
+  for(let index = 0; index < localStorage.length; index++){
+    const key = localStorage.key(index);
+    if(key && key.startsWith(logPrefix)) logKeys.push(key);
+  }
+  logKeys.forEach(key => localStorage.removeItem(key));
+  Object.keys(memStorage).filter(key => key.startsWith('log:')).forEach(key => delete memStorage[key]);
+  state.logDates = [];
+  state.currentLog = [];
+  state.onboardingDemoActive = false;
+  state.onboardingFinishPrompt = false;
+  state.onboardingCompleted = true;
+  state.modal = null;
+  await safeSet('logDates', []);
+  await safeSet('onboardingDemoActive', false);
+  await safeSet('onboardingCompleted', true);
+  await safeSet('onboardingDemoDates', []);
+  render();
+  showToast('Workout logs cleared. Start fresh!', false);
+}
+
 async function dismissTip(key){
   state.settings.tipsDismissed = { ...state.settings.tipsDismissed, [key]: true };
   await safeSet('settings', state.settings);
@@ -1367,13 +1720,17 @@ async function openExerciseDetails(exerciseId){
 }
 
 function closeExerciseDetails(){
+  destroyExerciseDetailCharts();
+  state.modal = null;
+  render();
+}
+
+function destroyExerciseDetailCharts(){
   if(state.detailChart) state.detailChart.destroy();
   if(state.detailRepChart) state.detailRepChart.destroy();
   state.detailChart = null;
   state.detailRepChart = null;
   state.detailExerciseId = null;
-  state.modal = null;
-  render();
 }
 
 function detailRangeStart(range){
@@ -1600,7 +1957,7 @@ function renderLogListContent(){
     }
 
     return `
-      <div class="card"
+      <div class="card" ${index===0 ? 'data-onboarding-target="sets"' : ''}
            draggable="false"
            ondragstart="handleDragStart(event, ${index})"
            ondragover="handleDragOver(event, ${index})"
@@ -1613,7 +1970,7 @@ function renderLogListContent(){
             ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
           </div>
           <div style="display:flex; align-items:center; gap:2px;">
-            <button class="icon-btn info-btn" onclick="event.stopPropagation(); openExerciseDetails('${entry.exerciseId}')" title="View progress details" aria-label="View progress details">i</button>
+            <button class="icon-btn info-btn" ${index===0 ? 'data-onboarding-target="progress"' : ''} onclick="event.stopPropagation(); openExerciseDetails('${entry.exerciseId}')" title="View progress details" aria-label="View progress details">i</button>
             <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')" title="Delete workout log" aria-label="Delete workout log">${trashIconSvg}</button>
           </div>
         </div>
@@ -1632,7 +1989,7 @@ function renderLogListContent(){
 function renderActionFooter(){
   return `
     <div class="center-action-area compact-action-footer">
-      <button class="btn btn-primary" onclick="openPicker()">+ Log workout</button>
+      <button class="btn btn-primary" data-onboarding-target="log" onclick="openPicker()">+ Log workout</button>
       ${state.currentLog.length === 0 ? '<button class="btn" onclick="openRoutinesModal()">Load preset</button>' : ''}
     </div>
   `;
@@ -1879,10 +2236,10 @@ function renderExerciseDetailsModal(){
         ${ranges.map(range => `<button class="chart-range ${state.detailRange === range ? 'active' : ''}" data-range="${range}" onclick="setDetailRange('${range}')">${range === 'all' ? 'All' : range.toUpperCase()}</button>`).join('')}
       </div>
       <h3 style="font-size:16px; margin:8px 0 0;">Max Weight</h3>
-      <div class="chart-wrap"><canvas id="exercise-chart"></canvas></div>
+      <div class="chart-wrap" data-onboarding-target="max-weight-chart"><canvas id="exercise-chart"></canvas></div>
       <h3 style="font-size:16px; margin:8px 0 0;">Rep Progression</h3>
       <div style="font-size:13px; color:var(--text-secondary); margin-bottom:4px;">Every set against a ${PROGRESSION_TARGET_REPS}-rep target</div>
-      <div class="chart-wrap rep-chart"><canvas id="exercise-rep-chart"></canvas></div>
+      <div class="chart-wrap rep-chart" data-onboarding-target="rep-progression-chart"><canvas id="exercise-rep-chart"></canvas></div>
       <h3 style="font-size:16px; margin:8px 0 0;">Workout history</h3>
       <div id="exercise-history-list"><div class="empty" style="padding:16px 0;">Loading history...</div></div>
     </div>
@@ -1900,11 +2257,13 @@ function renderProfileModal(){
         <div class="profile-avatar">${personIconSvg}</div>
         <div class="profile-name">Me</div>
       </div>
-      <div class="profile-option-list">
+      <div class="profile-option-list" data-onboarding-target="profile-data">
         <button class="btn" style="width:100%; justify-content:center;" onclick="openSettings()">Settings</button>
-        <button class="btn" style="width:100%; justify-content:center;" onclick="openRoutinesModal()">Presets</button>
+        <button class="btn" data-onboarding-target="presets" style="width:100%; justify-content:center;" onclick="openRoutinesModal()">Presets</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="triggerImport()">Import</button>
         <button class="btn" style="width:100%; justify-content:center;" onclick="exportData()">Export</button>
+        <button class="btn" style="width:100%; justify-content:center;" onclick="startOnboardingTour()">Replay app tour</button>
+        ${state.onboardingDemoActive ? '<button class="btn btn-danger" style="width:100%; justify-content:center;" onclick="clearWorkoutLogsAndStartFresh()">Clear workout logs and start fresh</button>' : ''}
       </div>
       <div class="profile-section">
         <h3>About</h3>
@@ -2021,12 +2380,12 @@ function renderPickerModal(){
     <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h2>Add workout to log</h2>
-        <input type="text" id="pickerSearchInput" placeholder="Search workout or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="state.pickerSearch=this.value; renderPickerList();">
+        <input type="text" id="pickerSearchInput" data-onboarding-target="exercise-search" placeholder="Search workout or tag name..." value="${escapeAttr(state.pickerSearch)}" oninput="state.pickerSearch=this.value; renderPickerList();">
         <div class="filter-bar">
           <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
           ${tagChips}
         </div>
-        <div style="flex:1; overflow-y:auto;" class="picker-list-container"></div>
+        <div style="flex:1; overflow-y:auto;" class="picker-list-container" data-onboarding-target="exercise-choices"></div>
         <div class="footer-actions">
           <button class="btn" style="width:100%;" onclick="closeModal()">Close</button>
         </div>
@@ -2059,8 +2418,8 @@ function renderPickerList(){
     let html = '';
 
     if (filtered.length) {
-      html += filtered.map(ex=>`
-        <div class="list-item" onclick="addExerciseToLog('${ex.id}')">
+      html += filtered.map((ex,index)=>`
+        <div class="list-item" ${index===0 ? 'data-onboarding-target="exercise-choice"' : ''} onclick="addExerciseToLog('${ex.id}')">
           <div class="item-info" style="flex-direction:column; align-items:flex-start; gap:4px; min-width:0;">
             <span class="ex-name">${escapeHtml(ex.name)}</span>
             ${ex.tagIds && ex.tagIds.length ? `<div class="tags-scrollable" style="max-width:100%; width:100%;">${ex.tagIds.map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</div>` : ''}
@@ -2076,7 +2435,7 @@ function renderPickerList(){
     }
 
     if (query && !exactMatch) {
-      html += `<div class="list-item create-item" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
+      html += `<div class="list-item create-item" data-onboarding-target="create-exercise" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
     }
 
     listContainer.innerHTML = html;
@@ -2150,11 +2509,11 @@ function renderNewExerciseModal(){
       <div class="modal">
         <h2>${isEdit ? 'Edit workout' : 'New workout'}</h2>
         <label>Name</label>
-        <input type="text" id="newExNameInput" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
+        <input type="text" id="newExNameInput" data-onboarding-target="exercise-name" placeholder="e.g. Bench Press" value="${escapeAttr(state.newExName)}">
         ${state.formError ? `<div class="error">${state.formError}${state.formErrorExerciseId ? ` &mdash; <a href="#" onclick="event.preventDefault(); addExerciseToLog('${state.formErrorExerciseId}');">Use existing</a>` : ''}</div>` : ''}
         
         <label>Tags (type to search or create)</label>
-        <div class="tag-field-container">
+        <div class="tag-field-container" data-onboarding-target="exercise-tags">
           ${selectedChips}
           <input type="text" id="tagInlineInput" placeholder="${state.newExTags.length === 0 ? 'Search or add tags...' : 'Add tag...'}" value="${escapeAttr(state.tagInputQuery)}" oninput="state.tagInputQuery=this.value; renderTagOptions();" onkeydown="if(event.key==='Enter'){event.preventDefault(); if(state.tagInputQuery.trim()) createAndApplyTag(state.tagInputQuery.trim());}">
         </div>
