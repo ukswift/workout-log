@@ -433,7 +433,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.15";
+const APP_VERSION = "1.0.16";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -619,13 +619,18 @@ async function loadAll(){
 }
 
 async function loadChartDemoData(){
-  if(new URLSearchParams(window.location.search).get('demo') !== 'chart') return;
+  const demoMode = new URLSearchParams(window.location.search).get('demo');
+  if(demoMode !== 'chart' && demoMode !== '30d') return;
   const exercise = state.exercises[0];
   if(!exercise) return;
 
   const baseDate = new Date(state.currentDate + 'T00:00:00');
-  const demoOffsets = [7, 4, 0];
-  const demoSessions = [
+  const demoOffsets = demoMode === '30d' ? Array.from({length:30}, (_, index) => 29 - index) : [7, 4, 0];
+  const demoSessions = demoMode === '30d' ? demoOffsets.map((_, index) => {
+    const weight = 75 + Math.floor(index / 5) * 5;
+    const progress = index % 5;
+    return {weights:[weight, weight, weight], reps:[8 + progress, 9 + progress, 8 + progress]};
+  }) : [
     {weights:[75, 90, 90], reps:[12, 12, 12]},
     {weights:[90, 105, 120], reps:[12, 12, 10]},
     {weights:[105, 105, 105], reps:[11, 12, 13]}
@@ -1403,13 +1408,9 @@ async function loadExerciseDetails(){
     const sessions = history.slice().sort((a,b) => b.date.localeCompare(a.date));
     historyList.innerHTML = sessions.length ? sessions.map(item => {
       const completedSets = item.sets.filter(set => set.weight !== '' && set.reps !== '');
-      const targetSets = completedSets.filter(set => Number(set.reps) >= PROGRESSION_TARGET_REPS).length;
-      const sessionWeights = [...new Set(completedSets.map(set => Number(set.weight)))];
-      const isSingleWeight = sessionWeights.length === 1;
-      const progressionStatus = !isSingleWeight ? `${targetSets}/${completedSets.length} target · exploring` : targetSets === completedSets.length ? 'Ready for next weight' : `${targetSets}/${completedSets.length} target`;
       return `
         <div class="history-session">
-          <div class="history-session-date"><span>${displayDate(item.date)}</span><span class="history-session-max">${item.maxWeight !== null ? `${item.maxWeight} lb max` : 'No max'} · ${progressionStatus}</span></div>
+          <div class="history-session-date"><span>${displayDate(item.date)}</span><span class="history-session-max">${item.maxWeight !== null ? `${item.maxWeight} lb max` : 'No max'}</span></div>
           <div class="set-tiles">
             ${completedSets.map(set => `<span class="set-pill history-readonly-pill">${set.weight}lbs x ${set.reps}</span>`).join('') || '<span style="color:var(--text-muted);">No completed sets</span>'}
           </div>
