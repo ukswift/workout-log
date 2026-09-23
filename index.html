@@ -436,8 +436,14 @@
   .history-session-max{color:var(--text-secondary); font-weight:500; white-space:nowrap;}
   .history-session .set-tiles{width:100%;}
   .history-readonly-pill{cursor:default;}
-  .calendar-day.has-log:not(.selected){font-weight:700!important;}
-  .calendar-day.today{outline:2px solid var(--accent); outline-offset:-2px;}
+  .calendar-day{position:relative; display:flex; align-items:center; justify-content:center; min-height:46px;}
+  .calendar-day.has-log{font-weight:700!important;}
+  .calendar-day.selected{outline:2px solid var(--text-secondary); outline-offset:1px;}
+  .calendar-legend{display:flex; justify-content:center; flex-wrap:wrap; gap:14px; padding:0 8px 8px; color:var(--text-secondary); font-size:12px;}
+  .calendar-legend-item{display:inline-flex; align-items:center; gap:6px;}
+  .calendar-legend-selected{width:12px; height:12px; border:2px solid var(--text-secondary); border-radius:4px;}
+  .calendar-legend-today{width:12px; height:12px; border-radius:4px; background:var(--accent);}
+  .calendar-legend-log{width:12px; height:12px; border-radius:4px; background:var(--success);}
   .calendar-swipe-area{touch-action:pan-y;}
 </style>
 </head>
@@ -448,7 +454,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.17";
+const APP_VERSION = "1.0.18";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -1236,20 +1242,11 @@ function renderDatePicker(){
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isToday = dateStr === today;
     const isSelected = dateStr === state.currentDate;
-    let bgColor = 'transparent';
-    let color = 'var(--text)';
-
     const hasLog = state.calendarLogDates.has(dateStr);
-    if (isToday) {
-      bgColor = 'var(--accent)';
-      color = '#fff';
-    } else if (isSelected) {
-      bgColor = 'var(--accent)';
-      color = '#fff';
-    } else if (hasLog) {
-      bgColor = 'var(--success)';
-      color = '#fff';
-    }
+    const bgColor = isToday ? 'var(--accent)' : hasLog ? 'var(--success)' : 'transparent';
+    const color = isToday || hasLog ? '#fff' : 'var(--text)';
+    const accessibleDate = new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+    const dateStates = [isToday && 'today', isSelected && 'selected', hasLog && 'workout logged'].filter(Boolean).join(', ');
 
     calendarHtml += `
       <button class="calendar-day ${hasLog ? 'has-log' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" style="
@@ -1261,7 +1258,7 @@ function renderDatePicker(){
         cursor:pointer;
         font-weight:500;
         font-size:14px;
-      " onclick="selectDate('${dateStr}')">${day}</button>
+      " aria-label="${accessibleDate}${dateStates ? `, ${dateStates}` : ''}" aria-pressed="${isSelected}" onclick="selectDate('${dateStr}')">${day}</button>
     `;
   }
 
@@ -1280,6 +1277,11 @@ function renderDatePicker(){
         </div>
         <div style="padding:12px;">
           ${calendarHtml}
+        </div>
+        <div class="calendar-legend" aria-label="Calendar legend">
+          <span class="calendar-legend-item"><span class="calendar-legend-selected" aria-hidden="true"></span>Selected</span>
+          <span class="calendar-legend-item"><span class="calendar-legend-today" aria-hidden="true"></span>Today</span>
+          <span class="calendar-legend-item"><span class="calendar-legend-log" aria-hidden="true"></span>Workout logged</span>
         </div>
         </div>
         <div class="footer-actions">
