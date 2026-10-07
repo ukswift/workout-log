@@ -183,6 +183,7 @@
     border-radius:8px; color:var(--text-muted); min-width:40px; min-height:40px;
   }
   .icon-btn:active{background:rgba(0,0,0,0.08);}
+  .icon-btn.tag-edit{color:var(--accent);}
   .icon-btn.danger{color:var(--danger);}
   .icon-btn.danger:active{background:var(--danger-bg);}
   .icon-svg {
@@ -267,11 +268,20 @@
   .picker-search-header{display:flex; flex-direction:column; align-items:stretch; flex-shrink:0;}
   .picker-search-close{display:none; flex-shrink:0;}
   .modal.search-focused .picker-search-heading,
-  .modal.search-focused .filter-bar,
-  .modal.search-focused .footer-actions{display:none;}
-  .modal.search-focused .picker-search-close{display:inline-flex;}
-  .modal.search-focused .picker-search-header{flex-direction:row; align-items:center; gap:8px; padding:env(safe-area-inset-top) 20px 8px;}
-  .modal.search-focused .picker-search-header input[type=text]{flex:1; min-width:0; width:auto; margin:0;}
+  .modal.search-focused .filter-bar{display:none;}
+  .modal.search-focused.tag-exercise-picker .tag-name-editor,
+  .modal.search-focused.tag-exercise-picker .picker-search-label{display:none;}
+  .modal.search-focused.tag-exercise-picker .tag-exercise-search{padding-top:8px;}
+  .modal.search-focused:not(.tag-exercise-picker) .footer-actions{display:none;}
+  .modal.search-focused:not(.tag-exercise-picker) .picker-search-close{display:inline-flex;}
+  .modal.search-focused:not(.tag-exercise-picker) .picker-search-header{flex-direction:row; align-items:center; gap:8px; padding:env(safe-area-inset-top) 20px 8px;}
+  .modal.search-focused:not(.tag-exercise-picker) .picker-search-header input[type=text]{flex:1; min-width:0; width:auto; margin:0;}
+  .tag-name-editor{display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:8px; padding:0 20px 12px; flex-shrink:0;}
+  .tag-name-editor label{grid-column:1 / -1; margin:0;}
+  .tag-name-editor input[type=text]{margin:0; width:100%; min-width:0;}
+  .tag-exercise-search{padding:0 20px 12px; flex-shrink:0;}
+  .tag-exercise-search label{margin:0 0 6px;}
+  .modal .tag-exercise-search input[type=text]{margin:0; width:100%;}
   .modal .footer-actions {
     flex-shrink: 0;
     background: var(--card);
@@ -369,6 +379,8 @@
   .profile-name{font-weight:600; font-size:18px;}
   .profile-option-list{display:flex; flex-direction:column; gap:12px; margin-bottom:28px;}
   .tag-manager-row input{flex:1; min-width:0; margin:0;}
+  .tag-manager-usage{font-size:13px; color:var(--text-secondary); line-height:1.4; overflow-wrap:anywhere;}
+  .tag-manager-entry{border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;}
   .profile-section{margin-bottom:24px;}
   .profile-section h3{
     font-size:13px; color:var(--text-secondary); text-transform:uppercase;
@@ -488,7 +500,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.23";
+const APP_VERSION = "1.0.24";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -557,6 +569,7 @@ let state = {
   routineCancelTarget: 'routines',
   tagManagerSearch: '',
   editingTagId: null,
+  editingTagExercisesId: null,
   settings: { showTags: false, chartRange: 'all', pickerLimits: PICKER_LIMITS, tipsDismissed: {} },
   detailExerciseId: null,
   detailRange: null,
@@ -1201,6 +1214,7 @@ function openTagManager(){
   state.modal = 'tagManager';
   state.tagManagerSearch = '';
   state.editingTagId = null;
+  state.editingTagExercisesId = null;
   render();
 }
 
@@ -1219,12 +1233,7 @@ async function createTagFromManager(){
 }
 
 function editManagedTag(tagId){
-  state.editingTagId = tagId;
-  render();
-  requestAnimationFrame(() => {
-    const input = document.querySelector('#managedTagName');
-    if(input){ input.focus(); input.select(); }
-  });
+  openTagExercisePicker(tagId);
 }
 
 async function saveManagedTag(tagId){
@@ -1242,7 +1251,7 @@ async function saveManagedTag(tagId){
   const tag = state.tags.find(item => item.id === tagId);
   if(!tag) return;
   tag.name = name;
-  state.editingTagId = null;
+  state.editingTagId = state.modal === 'tagExercisePicker' ? tagId : null;
   await safeSet('tags', state.tags);
   render();
 }
@@ -1250,14 +1259,53 @@ async function saveManagedTag(tagId){
 async function deleteManagedTag(tagId){
   const tag = state.tags.find(item => item.id === tagId);
   if(!tag) return;
-  const affectedCount = state.exercises.filter(ex => (ex.tagIds || []).includes(tagId)).length;
-  const exerciseLabel = affectedCount === 1 ? 'exercise' : 'exercises';
-  if(!confirm(`Delete "${tag.name}" and remove it from ${affectedCount} ${exerciseLabel}?`)) return;
+  const affectedExercises = state.exercises.filter(ex => (ex.tagIds || []).includes(tagId));
+  const exerciseList = affectedExercises.length ? affectedExercises.map(ex => `- ${ex.name}`).join('\n') : 'None';
+  if(!confirm(`Delete "${tag.name}" and remove it from these exercises?\n\n${exerciseList}`)) return;
   state.tags = state.tags.filter(item => item.id !== tagId);
   state.exercises.forEach(ex => {
     if(Array.isArray(ex.tagIds)) ex.tagIds = ex.tagIds.filter(id => id !== tagId);
   });
   await Promise.all([safeSet('tags', state.tags), safeSet('exercises', state.exercises)]);
+  render();
+}
+
+function openTagExercisePicker(tagId){
+  state.editingTagExercisesId = tagId;
+  state.editingTagId = tagId;
+  state.pickerSearch = '';
+  state.pickerTag = null;
+  state.modal = 'tagExercisePicker';
+  render();
+}
+
+async function setManagedTagExercise(tagId, exerciseId, isTagged){
+  const exercise = state.exercises.find(ex => ex.id === exerciseId);
+  if(!exercise) return;
+  if(!Array.isArray(exercise.tagIds)) exercise.tagIds = [];
+  if(isTagged && !exercise.tagIds.includes(tagId)) exercise.tagIds.push(tagId);
+  if(!isTagged) exercise.tagIds = exercise.tagIds.filter(id => id !== tagId);
+  await safeSet('exercises', state.exercises);
+  const usage = document.getElementById(`tag-usage-${tagId}`);
+  if(usage){
+    const names = state.exercises.filter(ex => (ex.tagIds || []).includes(tagId)).map(ex => ex.name);
+    usage.textContent = names.length ? `Used by: ${names.join(', ')}` : 'Not used by any exercises';
+  }
+}
+
+async function togglePickerExerciseTag(exerciseId, isTagged){
+  const tagId = state.editingTagExercisesId;
+  const exercise = state.exercises.find(ex => ex.id === exerciseId);
+  if(!tagId || !exercise) return;
+  const nextValue = typeof isTagged === 'boolean' ? isTagged : !(exercise.tagIds || []).includes(tagId);
+  await setManagedTagExercise(tagId, exerciseId, nextValue);
+  renderPickerList();
+}
+
+function closeTagExercisePicker(){
+  state.editingTagExercisesId = null;
+  state.editingTagId = null;
+  state.modal = 'tagManager';
   render();
 }
 
@@ -1271,7 +1319,7 @@ function renderTagManagerList(){
     <button class="btn btn-primary" style="width:100%; justify-content:center; margin-bottom:16px;" onclick="createTagFromManager()">Create "#${escapeHtml(state.tagManagerSearch.trim())}"</button>
   ` : '';
   const rows = matches.map(tag => {
-    const usageCount = state.exercises.filter(ex => (ex.tagIds || []).includes(tag.id)).length;
+    const usageNames = state.exercises.filter(ex => (ex.tagIds || []).includes(tag.id)).map(ex => ex.name);
     if(state.editingTagId === tag.id){
       return `
         <div class="list-item tag-manager-row">
@@ -1284,14 +1332,16 @@ function renderTagManagerList(){
       `;
     }
     return `
-      <div class="list-item tag-manager-row">
-        <div class="item-info" style="flex-direction:column; align-items:flex-start; gap:2px;">
-          <strong>#${escapeHtml(tag.name)}</strong>
-          <span style="font-size:13px; color:var(--text-secondary);">${usageCount} ${usageCount === 1 ? 'exercise' : 'exercises'}</span>
-        </div>
-        <div class="item-actions">
-          <button class="icon-btn" onclick="editManagedTag('${tag.id}')" title="Rename tag" aria-label="Rename tag">${editIconSvg}</button>
-          <button class="icon-btn danger" onclick="deleteManagedTag('${tag.id}')" title="Delete tag" aria-label="Delete tag">${trashIconSvg}</button>
+      <div class="tag-manager-entry">
+        <div class="list-item tag-manager-row">
+          <div class="item-info" style="flex-direction:column; align-items:flex-start; gap:2px;">
+            <strong>#${escapeHtml(tag.name)}</strong>
+            <span id="tag-usage-${tag.id}" class="tag-manager-usage">${usageNames.length ? `Used by: ${usageNames.map(escapeHtml).join(', ')}` : 'Not used by any exercises'}</span>
+          </div>
+          <div class="item-actions">
+            <button class="icon-btn tag-edit" onclick="editManagedTag('${tag.id}')" title="Edit tag" aria-label="Edit tag">${editIconSvg}</button>
+            <button class="icon-btn danger" onclick="deleteManagedTag('${tag.id}')" title="Delete tag" aria-label="Delete tag">${trashIconSvg}</button>
+          </div>
         </div>
       </div>
     `;
@@ -2386,6 +2436,7 @@ async function addSetInline(entryId){
 
 function renderModal(){
   if(state.modal==='picker') return renderPickerModal();
+  if(state.modal==='tagExercisePicker') return renderPickerModal();
   if(state.modal==='newExercise') return renderNewExerciseModal();
   if(state.modal==='editExercise') return renderNewExerciseModal();
   if(state.modal==='tagManager') return renderTagManager();
@@ -2578,25 +2629,39 @@ function renderDayActionsModal(){
 }
 
 function renderPickerModal(){
+  const isTagExercisePicker = state.modal === 'tagExercisePicker';
+  const selectedTag = state.tags.find(tag => tag.id === state.editingTagExercisesId);
   const tagChips = [...state.tags].sort((a,b) => a.name.localeCompare(b.name, undefined, {sensitivity:'base'})).map(t=>`
     <button class="tag-toggle ${state.pickerTag===t.id?'active':''}" onclick="setPickerTag('${t.id}')">${escapeHtml(t.name)}</button>
   `).join('');
 
   const html = `
-    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
-      <div class="modal ${state.pickerSearch.trim() ? 'search-focused' : ''}">
+    <div class="modal-overlay" onclick="if(event.target===this) ${isTagExercisePicker ? 'closeTagExercisePicker()' : 'closeModal()'}">
+      <div class="modal ${isTagExercisePicker ? 'tag-exercise-picker ' : ''}${state.pickerSearch.trim() ? 'search-focused' : ''}">
         <div class="picker-search-header">
-          <h2 class="picker-search-heading">Add workout to log</h2>
-          <input type="text" id="pickerSearchInput" data-onboarding-target="exercise-search" placeholder="Search workout or tag name..." value="${escapeAttr(state.pickerSearch)}" onfocus="this.closest('.modal').classList.add('search-focused')" onblur="this.closest('.modal').classList.toggle('search-focused', Boolean(this.value.trim()))" oninput="state.pickerSearch=this.value; this.closest('.modal').classList.toggle('search-focused', this===document.activeElement || Boolean(this.value.trim())); renderPickerList();">
-          <button class="icon-btn picker-search-close" onclick="closeModal()" title="Close exercise search" aria-label="Close exercise search">&times;</button>
+          <h2 class="picker-search-heading">${isTagExercisePicker ? `Edit #${escapeHtml(selectedTag ? selectedTag.name : 'tag')}` : 'Add workout to log'}</h2>
+          ${!isTagExercisePicker ? `<input type="text" id="pickerSearchInput" data-onboarding-target="exercise-search" placeholder="Search workout or tag name..." value="${escapeAttr(state.pickerSearch)}" onfocus="this.closest('.modal').classList.add('search-focused')" onblur="this.closest('.modal').classList.toggle('search-focused', Boolean(this.value.trim()))" oninput="state.pickerSearch=this.value; this.closest('.modal').classList.toggle('search-focused', this===document.activeElement || Boolean(this.value.trim())); renderPickerList();">` : ''}
+          ${!isTagExercisePicker ? '<button class="icon-btn picker-search-close" onclick="closeModal()" title="Close exercise search" aria-label="Close exercise search">&times;</button>' : ''}
         </div>
-        <div class="filter-bar">
-          <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
-          ${tagChips}
-        </div>
+        ${isTagExercisePicker ? `
+          <div class="tag-name-editor">
+            <label for="managedTagName">Tag name</label>
+            <input type="text" id="managedTagName" value="${escapeAttr(selectedTag ? selectedTag.name : '')}" aria-label="Tag name" onkeydown="if(event.key==='Enter'){event.preventDefault(); saveManagedTag('${state.editingTagId}');}">
+            <button class="btn btn-primary" onclick="saveManagedTag('${state.editingTagId}')">Save name</button>
+          </div>
+          <div class="tag-exercise-search">
+            <label class="picker-search-label" for="pickerSearchInput">Search exercises</label>
+            <input type="text" id="pickerSearchInput" data-onboarding-target="exercise-search" placeholder="Search exercises..." value="${escapeAttr(state.pickerSearch)}" onfocus="this.closest('.modal').classList.add('search-focused')" onblur="this.closest('.modal').classList.toggle('search-focused', Boolean(this.value.trim()))" oninput="state.pickerSearch=this.value; this.closest('.modal').classList.toggle('search-focused', this===document.activeElement || Boolean(this.value.trim())); renderPickerList();">
+          </div>
+        ` : `
+          <div class="filter-bar">
+            <button class="tag-toggle ${!state.pickerTag?'active':''}" onclick="setPickerTag(null)">All</button>
+            ${tagChips}
+          </div>
+        `}
         <div class="picker-list-container" data-onboarding-target="exercise-choices"></div>
         <div class="footer-actions">
-          <button class="btn" style="width:100%;" onclick="closeModal()">Close</button>
+          <button class="btn" style="width:100%;" onclick="${isTagExercisePicker ? 'closeTagExercisePicker()' : 'closeModal()'}">${isTagExercisePicker ? 'Done' : 'Close'}</button>
         </div>
       </div>
     </div>
@@ -2611,14 +2676,23 @@ function renderPickerList(){
     const listContainer = document.querySelector('.picker-list-container');
     if (!listContainer) return;
 
-    const sorted = [...state.exercises].sort((a,b) => a.name.localeCompare(b.name));
+    const isTagExercisePicker = state.modal === 'tagExercisePicker';
+    const selectedTagId = state.editingTagExercisesId;
+    const sorted = [...state.exercises].sort((a,b) => {
+      if(isTagExercisePicker){
+        const aTagged = (a.tagIds || []).includes(selectedTagId);
+        const bTagged = (b.tagIds || []).includes(selectedTagId);
+        if(aTagged !== bTagged) return aTagged ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
     const query = state.pickerSearch.trim().toLowerCase();
 
     const filtered = sorted.filter(ex => {
       const matchesName = ex.name.toLowerCase().includes(query);
       const matchesExerciseTag = ex.tagIds && ex.tagIds.some(tid => tagName(tid).toLowerCase().includes(query));
       const matchesSearch = !query || matchesName || matchesExerciseTag;
-      const matchesFilterTag = !state.pickerTag || (ex.tagIds && ex.tagIds.includes(state.pickerTag));
+      const matchesFilterTag = isTagExercisePicker || !state.pickerTag || (ex.tagIds && ex.tagIds.includes(state.pickerTag));
       return matchesSearch && matchesFilterTag;
     });
 
@@ -2627,23 +2701,26 @@ function renderPickerList(){
     let html = '';
 
     if (filtered.length) {
-      html += filtered.map((ex,index)=>`
-        <div class="list-item" ${index===0 ? 'data-onboarding-target="exercise-choice"' : ''} onclick="addExerciseToLog('${ex.id}')">
+      html += filtered.map((ex,index)=>{
+        const isTagged = isTagExercisePicker && (ex.tagIds || []).includes(selectedTagId);
+        return `
+        <div class="list-item" ${index===0 ? 'data-onboarding-target="exercise-choice"' : ''} onclick="${isTagExercisePicker ? `togglePickerExerciseTag('${ex.id}')` : `addExerciseToLog('${ex.id}')`}">
           <div class="item-info" style="flex-direction:column; align-items:flex-start; gap:4px; min-width:0;">
             <span class="ex-name">${escapeHtml(ex.name)}</span>
             ${ex.tagIds && ex.tagIds.length ? `<div class="tags-scrollable" style="max-width:100%; width:100%;">${sortedTagIds(ex.tagIds).map(tid=>`<span class="tag">#${tagName(tid)}</span>`).join('')}</div>` : ''}
           </div>
           <div class="item-actions" style="flex-shrink:0; margin-left:auto;">
-            <button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit workout" aria-label="Edit workout">${editIconSvg}</button>
-            <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete workout" aria-label="Delete workout">${trashIconSvg}</button>
+            ${isTagExercisePicker ? `<input type="checkbox" aria-label="${isTagged ? 'Remove' : 'Add'} ${escapeAttr(tagName(selectedTagId))} tag on ${escapeAttr(ex.name)}" ${isTagged ? 'checked' : ''} onclick="event.stopPropagation()" onchange="togglePickerExerciseTag('${ex.id}',this.checked)">` : `<button class="icon-btn" onclick="event.stopPropagation(); openEditExercise('${ex.id}')" title="Edit workout" aria-label="Edit workout">${editIconSvg}</button>
+            <button class="icon-btn danger" onclick="event.stopPropagation(); deleteExercise('${ex.id}')" title="Delete workout" aria-label="Delete workout">${trashIconSvg}</button>`}
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     } else if (!query) {
       html = `<div class="empty">No exercises found.</div>`;
     }
 
-    if (query && !exactMatch) {
+    if (!isTagExercisePicker && query && !exactMatch) {
       html += `<div class="list-item create-item" data-onboarding-target="create-exercise" onclick="openCreateFromSearch('${escapeAttr(state.pickerSearch.trim())}')">+ Create "${escapeHtml(state.pickerSearch.trim())}"</div>`;
     }
 
