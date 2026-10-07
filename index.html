@@ -82,6 +82,8 @@
   .header-main{display:flex; align-items:center; justify-content:space-between; gap:8px;}
   .header-brand{display:flex; align-items:center; gap:8px;}
   .date-nav{display:flex; align-items:center; justify-content:center; gap:12px; margin-top:10px; color:var(--text-secondary); font-size:16px; font-weight:600;}
+  .date-nav .date-step-button{display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; padding:0; border:1px solid var(--border); border-radius:8px;}
+  .date-nav .date-step-button .icon-svg{width:18px; height:18px;}
   .routine-selected-list{border:1px solid var(--accent); border-radius:10px; overflow:hidden; margin-bottom:12px;}
   .routine-all-label{margin-top:8px;}
   
@@ -110,6 +112,7 @@
     display:inline-flex; align-items:center; justify-content:center; touch-action:none;
   }
   .drag-handle:active{cursor:grabbing;}
+  .drag-handle .icon-svg{width:18px; height:18px;}
   .ex-name{font-weight:600; font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .tags-inline{display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center;}
   .tags-scrollable{
@@ -186,6 +189,11 @@
   .icon-btn.tag-edit{color:var(--accent);}
   .icon-btn.danger{color:var(--danger);}
   .icon-btn.danger:active{background:var(--danger-bg);}
+  .card-header .icon-btn{border:none; background:transparent; color:var(--accent);}
+  .card-header .icon-btn + .icon-btn{margin-left:-8px;}
+  .card-header .icon-btn:active{background:var(--accent-bg);}
+  .card-header .icon-btn.danger{color:var(--danger);}
+  .card-header .icon-btn.danger:active{background:var(--danger-bg);}
   .icon-svg {
     width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none;
     stroke-linecap:round; stroke-linejoin:round;
@@ -500,7 +508,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.24";
+const APP_VERSION = "1.0.25";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -700,6 +708,10 @@ function showToast(msg, allowUndo = true){
 
 const trashIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>`;
 const editIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+const gripIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M8 5h.01M16 5h.01M8 12h.01M16 12h.01M8 19h.01M16 19h.01"/></svg>`;
+const chartIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 4 3 6-7"/></svg>`;
+const chevronLeftIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>`;
+const chevronRightIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>`;
 const personIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg>`;
 const checkIconSvg = `<svg class="icon-svg" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></svg>`;
 
@@ -872,6 +884,7 @@ function tagName(id){ const t = state.tags.find(t=>t.id===id); return t ? t.name
 function sortedTagIds(ids){
   return [...ids].sort((a,b) => tagName(a).localeCompare(tagName(b), undefined, {sensitivity:'base'}));
 }
+function formatSetSummary(weight, reps){ return `${weight} lb × ${reps}`; }
 
 function getLastUsedSetValues(exerciseId) {
   const currentEntry = state.currentLog.find(e => e.exerciseId === exerciseId);
@@ -1647,9 +1660,9 @@ function render(){
         </div>
       </div>
       <div class="date-nav" data-onboarding-target="date">
-        <button class="btn-ghost" onclick="changeDate(-1)">&larr;</button>
+        <button class="btn-ghost date-step-button" onclick="changeDate(-1)" title="Previous day" aria-label="Previous day">${chevronLeftIconSvg}</button>
         <button class="btn-ghost" style="cursor:pointer; padding:4px 12px; border:1px solid var(--border); border-radius:6px; background:transparent; color:inherit; font-size:14px;" onclick="openDatePicker()">${displayDate(state.currentDate)}</button>
-        <button class="btn-ghost" onclick="changeDate(1)" ${state.currentDate===fmtDate(new Date())?'style="visibility:hidden"':''}>&rarr;</button>
+        <button class="btn-ghost date-step-button" onclick="changeDate(1)" title="Next day" aria-label="Next day" ${state.currentDate===fmtDate(new Date())?'style="visibility:hidden"':''}>${chevronRightIconSvg}</button>
       </div>
     </div>
     <div id="log-list">${renderLogListContent()}</div>
@@ -1987,7 +2000,7 @@ async function loadExerciseDetails(){
         <div class="history-session">
           <div class="history-session-date"><span>${displayDate(item.date)}</span><span class="history-session-max">${item.maxWeight !== null ? `${item.maxWeight} lb max` : 'No max'}</span></div>
           <div class="set-tiles">
-            ${completedSets.map(set => `<span class="set-pill history-readonly-pill">${set.weight}lbs x ${set.reps}</span>`).join('') || '<span style="color:var(--text-muted);">No completed sets</span>'}
+            ${completedSets.map(set => `<span class="set-pill history-readonly-pill">${formatSetSummary(set.weight, set.reps)}</span>`).join('') || '<span style="color:var(--text-muted);">No completed sets</span>'}
           </div>
         </div>
       `;
@@ -2006,10 +2019,48 @@ async function loadExerciseDetails(){
 
   if(canvas){
     const points = filtered.map((item, index) => ({x:axisValues[index], y:Math.max(...item.sets.filter(set => set.weight !== '').map(set => Number(set.weight)))}));
+    const maxWeightLabels = {
+      id:'maxWeightValueLabels',
+      afterDatasetsDraw(chart){
+        const meta = chart.getDatasetMeta(0);
+        if(!meta.data.length || !chart.chartArea) return;
+        const labelIndexes = [];
+        let lastLabelX = -Infinity;
+        meta.data.forEach((point, index) => {
+          if(index === 0 || point.x - lastLabelX >= 52){
+            labelIndexes.push(index);
+            lastLabelX = point.x;
+          }
+        });
+        const lastIndex = meta.data.length - 1;
+        if(!labelIndexes.includes(lastIndex)){
+          if(labelIndexes.length > 1) labelIndexes[labelIndexes.length - 1] = lastIndex;
+          else labelIndexes.push(lastIndex);
+        }
+        const {ctx, chartArea} = chart;
+        ctx.save();
+        ctx.font = '600 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        labelIndexes.forEach(index => {
+          const point = meta.data[index];
+          const label = `${points[index].y} lb`;
+          const width = ctx.measureText(label).width;
+          const x = Math.min(chartArea.right - width / 2 - 4, Math.max(chartArea.left + width / 2 + 4, point.x));
+          const y = Math.max(chartArea.top + 16, point.y - 8);
+          ctx.fillStyle = 'rgba(255,255,255,.9)';
+          ctx.fillRect(x - width / 2 - 4, y - 14, width + 8, 17);
+          ctx.fillStyle = '#0c447c';
+          ctx.fillText(label, x, y);
+        });
+        ctx.restore();
+      }
+    };
     state.detailChart = new Chart(canvas, {
       type:'line',
       data:{datasets:[{label:'Weight (lb)', data:points, parsing:false, borderColor:'#0c447c', backgroundColor:'rgba(12,68,124,.12)', pointBackgroundColor:'#0c447c', tension:.25, fill:true}]},
-      options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'nearest', intersect:false}, scales:{x:xScale, y:{beginAtZero:false, title:{display:true,text:'Weight (lb)'}}}, plugins:{legend:{display:false}, tooltip:{callbacks:{title:dateTooltip}}}}
+      options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'nearest', intersect:false}, scales:{x:xScale, y:{beginAtZero:false, title:{display:true,text:'Weight (lb)'}}}, plugins:{legend:{display:false}, tooltip:{callbacks:{title:dateTooltip}}}},
+      plugins:[maxWeightLabels]
     });
   }
 
@@ -2151,20 +2202,20 @@ function renderLogListContent(){
 
     entry.sets.forEach(s => {
       const isComplete = s.weight !== '' && s.reps !== '';
-      const isEditing = state.editingSet && state.editingSet.entryId === entry.id && state.editingSet.setId === s.id;
+      const isEditing = state.modal !== 'setPicker' && state.editingSet && state.editingSet.entryId === entry.id && state.editingSet.setId === s.id;
 
       if (isEditing) {
         editingHtml = `
           <div class="set-edit-inline">
             <input type="number" class="weight-input" min="0.1" step="any" inputmode="decimal" pattern="[0-9]*" value="${s.weight}" placeholder="lbs" oninput="updateSetField('${entry.id}','${s.id}','weight', this.value)">
-            <span class="lbl">lbs ×</span>
+            <span class="lbl">lb ×</span>
             <input type="number" min="1" step="1" inputmode="decimal" pattern="[0-9]*" value="${s.reps}" placeholder="reps" oninput="updateSetField('${entry.id}','${s.id}','reps', this.value)">
             <span class="lbl">reps</span>
             <button class="icon-btn danger" onclick="deleteSet('${entry.id}','${s.id}')" title="Delete set" aria-label="Delete set">${trashIconSvg}</button>
             <button class="save-set-btn" onclick="toggleEditSet('${entry.id}','${s.id}')" title="Save set" aria-label="Save set">${checkIconSvg}</button>
           </div>`;
       } else if (isComplete) {
-        completedTiles.push(`<button class="set-pill" data-set-id="${s.id}" onpointerdown="handlePillPointerDown(event,'${entry.id}','${s.id}')">${s.weight}lbs x ${s.reps}</button>`);
+        completedTiles.push(`<button class="set-pill" data-set-id="${s.id}" onpointerdown="handlePillPointerDown(event,'${entry.id}','${s.id}')">${formatSetSummary(s.weight, s.reps)}</button>`);
       }
     });
 
@@ -2190,12 +2241,12 @@ function renderLogListContent(){
            ondragend="handleDragEnd(event)">
         <div class="card-header">
           <div class="header-left">
-            <span class="drag-handle" role="button" tabindex="0" title="Drag to reorder" aria-label="Drag to reorder" onpointerdown="this.closest('.card').draggable=true" onpointerup="this.closest('.card').draggable=false">≡</span>
+            <span class="drag-handle" role="button" tabindex="0" title="Drag to reorder" aria-label="Drag to reorder" onpointerdown="this.closest('.card').draggable=true" onpointerup="this.closest('.card').draggable=false">${gripIconSvg}</span>
             <span class="ex-name">${escapeHtml(name)}</span>
             ${tags ? `<span class="tags-inline">${tags}</span>` : ''}
           </div>
-          <div style="display:flex; align-items:center; gap:2px;">
-            <button class="icon-btn info-btn" ${index===0 ? 'data-onboarding-target="progress"' : ''} onclick="event.stopPropagation(); openExerciseDetails('${entry.exerciseId}')" title="View progress details" aria-label="View progress details">i</button>
+          <div style="display:flex; align-items:center; gap:0;">
+            <button class="icon-btn info-btn" ${index===0 ? 'data-onboarding-target="progress"' : ''} onclick="event.stopPropagation(); openExerciseDetails('${entry.exerciseId}')" title="View progress details" aria-label="View progress details">${chartIconSvg}</button>
             <button class="icon-btn danger" onclick="deleteEntry('${entry.id}')" title="Delete workout log" aria-label="Delete workout log">${trashIconSvg}</button>
           </div>
         </div>
@@ -2598,7 +2649,7 @@ function renderSetPickerModal(){
           ${previousSession ? `
             <div class="set-picker-history-date">${displayDate(previousSession.date)} · ${previousSession.maxWeight} lb max</div>
             <div class="set-tiles">
-              ${previousSession.sets.map(set => `<span class="set-pill history-readonly-pill">${set.weight}lbs x ${set.reps}</span>`).join('')}
+              ${previousSession.sets.map(set => `<span class="set-pill history-readonly-pill">${formatSetSummary(set.weight, set.reps)}</span>`).join('')}
             </div>
           ` : '<div class="set-picker-history-date">No previous session yet.</div>'}
         </div>
