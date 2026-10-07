@@ -454,7 +454,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.19";
+const APP_VERSION = "1.0.20";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -1816,7 +1816,7 @@ async function loadExerciseDetails(){
     }));
     const lineColors = ['#d97706', '#0c447c', '#7c3aed', '#0891b2', '#dc2626', '#15803d'];
     const repDatasets = [...repPointsByWeight.entries()].map(([weight, data], index) => ({
-      label:`${weight} lb`, data, parsing:false, borderColor:lineColors[index % lineColors.length], backgroundColor:lineColors[index % lineColors.length], pointRadius:10, pointHoverRadius:12, borderWidth:2, tension:.2
+      label:`${weight} lb`, data, parsing:false, borderColor:lineColors[index % lineColors.length], backgroundColor:lineColors[index % lineColors.length], pointRadius:10, pointHoverRadius:12, borderWidth:2, showLine:false, tension:.2
     }));
     const lastGroupEnd = groupPositions.length ? groupPositions[groupPositions.length - 1] + Math.max(daySetCounts[daySetCounts.length - 1], 1) : 0;
     const repXScale = {type:'linear', min:-0.75, max:Math.max(0, lastGroupEnd + 1.5), afterBuildTicks:scale => { scale.ticks = groupPositions.map(value => ({value})); }, ticks:{autoSkip:false, maxRotation:45, minRotation:35, callback:value => { const index = groupPositions.indexOf(value); return index >= 0 ? new Date(filtered[index].date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : ''; }}, title:{display:true,text:'Workout day (sets ordered left to right)'}};
@@ -1830,7 +1830,7 @@ async function loadExerciseDetails(){
         groupPositions.forEach((position, index) => {
           const left = scales.x.getPixelForValue(position - 0.5);
           const right = scales.x.getPixelForValue(position + daySetCounts[index] - 0.5);
-          ctx.fillStyle = index % 2 === 0 ? 'rgba(12,68,124,.06)' : 'rgba(217,119,6,.06)';
+          ctx.fillStyle = index % 2 === 0 ? 'rgba(12,68,124,.12)' : 'rgba(217,119,6,.12)';
           ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
         });
         ctx.restore();
@@ -1856,7 +1856,7 @@ async function loadExerciseDetails(){
     state.detailRepChart = new Chart(repCanvas, {
       type:'line',
       data:{datasets:[
-        {label:'All sets (order)', data:orderPoints, parsing:false, borderColor:'rgba(107,114,128,.65)', backgroundColor:'transparent', pointRadius:0, borderWidth:2, borderDash:[3,4], tension:.2},
+        {label:'All sets (order)', data:orderPoints, parsing:false, borderColor:'rgba(107,114,128,.85)', backgroundColor:'transparent', pointRadius:0, borderWidth:2, tension:.2},
         ...repDatasets,
         {label:`Target (${PROGRESSION_TARGET_REPS} reps)`, data:targetPoints, parsing:false, borderColor:'#2e7d32', borderDash:[6,5], pointRadius:0, fill:false}
       ]},
