@@ -454,7 +454,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.18";
+const APP_VERSION = "1.0.19";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -1800,7 +1800,13 @@ async function loadExerciseDetails(){
   if(repCanvas){
     const repPointsByWeight = new Map();
     const orderPoints = [];
-    const groupPositions = filtered.map((item, index) => index * 4);
+    const daySetCounts = filtered.map(item => item.sets.filter(set => set.reps !== '' && Number(set.reps) > 0 && set.weight !== '').length);
+    const groupPositions = [];
+    let cursor = 0;
+    filtered.forEach((item, index) => {
+      groupPositions.push(cursor);
+      cursor += daySetCounts[index] + 1;
+    });
     filtered.forEach((item, index) => item.sets.filter(set => set.reps !== '' && Number(set.reps) > 0 && set.weight !== '').forEach((set, setIndex) => {
       const weight = Number(set.weight);
       if(!repPointsByWeight.has(weight)) repPointsByWeight.set(weight, []);
@@ -1812,8 +1818,9 @@ async function loadExerciseDetails(){
     const repDatasets = [...repPointsByWeight.entries()].map(([weight, data], index) => ({
       label:`${weight} lb`, data, parsing:false, borderColor:lineColors[index % lineColors.length], backgroundColor:lineColors[index % lineColors.length], pointRadius:10, pointHoverRadius:12, borderWidth:2, tension:.2
     }));
-    const repXScale = {type:'linear', min:-0.75, max:Math.max(0, groupPositions[groupPositions.length - 1] + 2.75), afterBuildTicks:scale => { scale.ticks = groupPositions.map(value => ({value})); }, ticks:{autoSkip:false, maxRotation:45, minRotation:35, callback:value => { const index = groupPositions.indexOf(value); return index >= 0 ? new Date(filtered[index].date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : ''; }}, title:{display:true,text:'Workout day (sets ordered left to right)'}};
-    const targetPoints = groupPositions.length ? [{x:-0.75, y:PROGRESSION_TARGET_REPS}, {x:groupPositions[groupPositions.length - 1] + 2.75, y:PROGRESSION_TARGET_REPS}] : [];
+    const lastGroupEnd = groupPositions.length ? groupPositions[groupPositions.length - 1] + Math.max(daySetCounts[daySetCounts.length - 1], 1) : 0;
+    const repXScale = {type:'linear', min:-0.75, max:Math.max(0, lastGroupEnd + 1.5), afterBuildTicks:scale => { scale.ticks = groupPositions.map(value => ({value})); }, ticks:{autoSkip:false, maxRotation:45, minRotation:35, callback:value => { const index = groupPositions.indexOf(value); return index >= 0 ? new Date(filtered[index].date + 'T00:00:00').toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : ''; }}, title:{display:true,text:'Workout day (sets ordered left to right)'}};
+    const targetPoints = groupPositions.length ? [{x:-0.75, y:PROGRESSION_TARGET_REPS}, {x:lastGroupEnd + 1.25, y:PROGRESSION_TARGET_REPS}] : [];
     const repProgressionVisuals = {
       id:'repProgressionVisuals',
       beforeDraw(chart){
@@ -1822,7 +1829,7 @@ async function loadExerciseDetails(){
         ctx.save();
         groupPositions.forEach((position, index) => {
           const left = scales.x.getPixelForValue(position - 0.5);
-          const right = scales.x.getPixelForValue(position + 2.5);
+          const right = scales.x.getPixelForValue(position + daySetCounts[index] - 0.5);
           ctx.fillStyle = index % 2 === 0 ? 'rgba(12,68,124,.06)' : 'rgba(217,119,6,.06)';
           ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
         });
