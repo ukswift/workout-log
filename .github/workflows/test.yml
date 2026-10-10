@@ -1,4 +1,4 @@
-name: Tests
+name: Tests & Deploy
 
 on:
   push:
@@ -8,15 +8,19 @@ on:
   # Lets you trigger a run by hand from the Actions tab.
   workflow_dispatch:
 
-# Only one run per branch at a time; a newer push cancels the older run.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# Least privilege by default; the deploy job requests more below.
+permissions:
+  contents: read
 
 jobs:
   e2e:
     name: Playwright end-to-end tests
     runs-on: ubuntu-latest
+
+    # One test run per branch at a time; a newer push cancels the older run.
+    concurrency:
+      group: ${{ github.workflow }}-tests-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Check out repository
@@ -59,3 +63,45 @@ jobs:
           path: test-results/
           retention-days: 3
           if-no-files-found: ignore
+
+  deploy:
+    name: Deploy to GitHub Pages
+    # Hard gate: this job (and therefore the live site) only runs if tests pass.
+    needs: e2e
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+
+    # Never cancel a deploy halfway through; queue instead.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Publish ONLY the static app - never tests/, node_modules/ or configs.
+      - name: Stage static site
+        run: |
+          mkdir -p _site
+          cp -r index.html manifest.json sw.js defaults.json icons LICENSE README.md _site/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

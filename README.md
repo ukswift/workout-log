@@ -118,7 +118,7 @@ Before each commit, the hook creates the next patch version and stages the synch
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.30
+### Current version: 1.0.31
 
 ## Local development
 

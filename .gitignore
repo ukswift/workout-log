@@ -25,6 +25,9 @@ yarn-error.log*
 dist/
 build/
 
+# Staging dir created by the Pages deploy job
+_site/
+
 # Logs
 *.log
 
