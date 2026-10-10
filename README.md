@@ -68,27 +68,42 @@ Avoid prioritizing cloud sync, social features, leaderboards, voice input, or pr
 
 ### Technical Improvements
 
-- [ ] **CI for End-to-End Tests** — Add a GitHub Actions workflow that installs Playwright and runs `npm test` on every push and pull request to `main`, uploading the HTML report and traces as build artifacts on failure
+- [x] **CI for End-to-End Tests** — GitHub Actions runs `npm test` on every push and pull request to `main`, uploads the HTML report and raw results as build artifacts (3-day retention), and gates the Pages deploy on green tests (see `.github/workflows/test.yml`)
 - [ ] **PWA Installation** — Improve install experience on all platforms
 - [ ] **Offline Sync Queue** — Queue actions when offline, sync when online
 - [ ] **Performance** — Optimize rendering for 100+ exercises
 - [ ] **Accessibility** — Improve WCAG compliance
 - [ ] **Unit Tests** — Add comprehensive test suite (Playwright e2e UX tests already exist in `tests/e2e/`)
 
+## Testing
+
+End-to-end UX tests live in `tests/e2e/` and run with [Playwright](https://playwright.dev) against **both** a mobile viewport (Pixel 5) and desktop Chrome, so layout regressions on either platform are caught.
+
+```bash
+npm test                  # run all tests (mobile + desktop)
+npm run test:e2e:headed   # watch a real browser
+npm run test:e2e:demo     # slow-motion, one worker — good for demos
+npm run test:e2e:ui       # interactive UI mode
+npm run test:e2e:record   # keep screenshots/video/trace for every test
+npm run test:e2e:report   # open the last HTML report
+```
+
+Screenshots, video and traces are saved on failure by default; set `PW_RECORD=always` (or `npm run test:e2e:record`) to capture them for passing runs too. Tests are served over HTTP by the config (`python3 -m http.server 4173`) because the app fetches `defaults.json` and registers a service worker.
+
 ## Deploying to GitHub Pages
 
+Deployment is **automatic and gated on tests**: the `deploy` job in `.github/workflows/test.yml` has `needs: e2e`, so `main` is only published when the test suite passes. Only the static app files are published (`index.html`, `manifest.json`, `sw.js`, `defaults.json`, `icons/`, `LICENSE`, `README.md`) — test and tooling files are never exposed.
+
+One-time setup:
+
 1. Create a new GitHub repo named `workout-log` (public).
-2. Add all the files in this folder to the repo root:
-   - `index.html`
-   - `manifest.json`
-   - `sw.js`
-   - `icons/` (icon-192.png, icon-512.png, icon-maskable-512.png, favicon-32.png)
-   - `README.md`, `LICENSE`, `.gitignore`
-3. Commit and push to the `main` branch.
-4. In the repo settings, go to **Settings → Pages**.
-5. Under **Build and deployment**, set **Source** to "Deploy from a branch", branch `main`, folder `/ (root)`.
-6. Save. GitHub will give you a URL like `https://<your-username>.github.io/workout-log/`.
-7. Open that URL on your phone's browser, then use **"Add to Home Screen"** (iOS Safari) or the **Install** prompt (Android Chrome).
+2. Commit and push to the `main` branch.
+3. In the repo settings, go to **Settings → Pages**.
+4. Under **Build and deployment**, set **Source** to **"GitHub Actions"**.
+5. Push again (or run the "Tests & Deploy" workflow manually from the **Actions** tab). GitHub gives you a URL like `https://<your-username>.github.io/workout-log/`.
+6. Open that URL on your phone's browser, then use **"Add to Home Screen"** (iOS Safari) or the **Install** prompt (Android Chrome).
+
+Because the source is "GitHub Actions" rather than a branch, the repository root is **not** served directly — anything committed there stays private.
 
 ## Data & privacy
 
@@ -118,7 +133,7 @@ Before each commit, the hook creates the next patch version and stages the synch
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.31
+### Current version: 1.0.32
 
 ## Local development
 
