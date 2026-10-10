@@ -18,7 +18,10 @@ module.exports = defineConfig({
   retries: process.env.CI ? 1 : 0,
   // Slowed-down runs take far longer, so give them more headroom.
   timeout: slowMo ? 300_000 : 30_000,
-  reporter: [["list"], ["html", { open: "never" }]],
+  // In CI also use the "github" reporter so failures annotate the diff inline.
+  reporter: process.env.CI
+    ? [["list"], ["html", { open: "never" }], ["github"]]
+    : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     launchOptions: { slowMo },
