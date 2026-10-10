@@ -114,7 +114,7 @@ Importing always shows a preview of what is on the device versus what is in the 
 - **Merge into my data** — keeps everything already on the device and only adds the days you don't have (overlapping days are skipped).
 - **Replace everything** — wipes the device and restores the backup exactly.
 
-Either way the import is validated first (empty or malformed backups are rejected instead of wiping your data), days that are not part of the resulting log are cleaned up, and the result is reported back with real counts, for example *"Restored 12 days (34 sets). Removed 30 old days"*.
+Either way the import is validated first (empty or malformed backups are rejected instead of wiping your data), days that are not part of the resulting log are cleaned up, and the result is reported back with real counts, for example _"Restored 12 days (34 sets). Removed 30 old days"_.
 
 ## Versioning
 
@@ -149,6 +149,13 @@ No build step required — it's plain HTML/CSS/JS. Just open `index.html` in a b
 ```bash
 npx serve .
 ```
+
+## Working on this project
+
+If you are an AI agent (or anyone) about to change this codebase, **read [`AGENTS.md`](AGENTS.md)
+first**. It is the living orientation document: architecture, hard constraints, a code map, the
+full feature inventory with the invariants each feature must preserve, the storage model, and how
+to test/version/deploy. Update it in the same commit as any change so it never goes stale.
 
 ## License
 
