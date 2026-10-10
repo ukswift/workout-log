@@ -77,7 +77,7 @@ Avoid prioritizing cloud sync, social features, leaderboards, voice input, or pr
 
 ## Testing
 
-End-to-end UX tests live in `tests/e2e/` and run with [Playwright](https://playwright.dev) against **both** a mobile viewport (Pixel 5) and desktop Chrome, so layout regressions on either platform are caught.
+End-to-end UX tests live in `tests/e2e/` and run with [Playwright](https://playwright.dev) against **both** a mobile viewport (Pixel 5) and desktop Chrome, so layout regressions on either platform are caught. They cover the core logging flow (logging a set, persistence across reloads, day navigation, the profile panel) and the import safety guarantees (cancelling changes nothing, empty backups are rejected, merge only adds missing days, replacing sweeps orphaned days).
 
 ```bash
 npm test                  # run all tests (mobile + desktop)
@@ -107,7 +107,14 @@ Because the source is "GitHub Actions" rather than a branch, the repository root
 
 ## Data & privacy
 
-All data is stored locally in your browser (`localStorage`), scoped to this app's origin. Nothing is sent to a server — each device/browser has its own independent copy. Use the **Export JSON** button to back up your data or move it to another device, and **Import JSON** to restore it.
+All data is stored locally in your browser (`localStorage`), scoped to this app's origin. Nothing is sent to a server — each device/browser has its own independent copy. Use the **Export** button to back up your data or move it to another device, and **Import** to restore it.
+
+Importing always shows a preview of what is on the device versus what is in the file, then asks you to choose:
+
+- **Merge into my data** — keeps everything already on the device and only adds the days you don't have (overlapping days are skipped).
+- **Replace everything** — wipes the device and restores the backup exactly.
+
+Either way the import is validated first (empty or malformed backups are rejected instead of wiping your data), days that are not part of the resulting log are cleaned up, and the result is reported back with real counts, for example *"Restored 12 days (34 sets). Removed 30 old days"*.
 
 ## Versioning
 
@@ -133,7 +140,7 @@ Before each commit, the hook creates the next patch version and stages the synch
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.33
+### Current version: 1.0.34
 
 ## Local development
 

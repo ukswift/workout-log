@@ -372,6 +372,15 @@
     display:flex; align-items:center; gap:12px; box-shadow:0 4px 16px rgba(0,0,0,0.2);
   }
   .toast button{background:transparent; border:none; color:#64b5f6; font-weight:bold; cursor:pointer; font-size:15px;}
+  .import-confirm-overlay{align-items:center; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); box-sizing:border-box;}
+  .import-confirm-modal{height:auto; max-height:85vh; border-radius:16px; max-width:460px;}
+  .import-confirm-body{padding:0 20px; overflow-y:auto; flex:1 1 auto; min-height:0; font-size:14.5px; color:var(--text-secondary);}
+  .import-compare{width:100%; border-collapse:collapse; margin:4px 0 14px;}
+  .import-compare th, .import-compare td{padding:7px 4px; text-align:right; border-bottom:1px solid var(--border); font-size:14px;}
+  .import-compare th:first-child, .import-compare td:first-child{text-align:left; color:var(--text);}
+  .import-compare thead th{color:var(--text-secondary); font-weight:600; font-size:12.5px; text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid var(--border-strong);}
+  .import-compare tr:last-child td{border-bottom:none;}
+  .import-confirm-actions{display:flex; flex-direction:column; gap:10px;}
   .routine-card{border:1px dashed var(--border-strong); padding:12px; border-radius:10px; margin-bottom:10px;}
 
   .fullscreen-panel{
@@ -508,7 +517,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.33";
+const APP_VERSION = "1.0.34";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -591,7 +600,9 @@ let state = {
   onboardingDemoActive: false,
   onboardingReplayActive: false,
   onboardingFinishPrompt: false,
-  pickerSelection: { weight: PICKER_LIMITS.weightMin, reps: PICKER_LIMITS.repsMin }
+  pickerSelection: { weight: PICKER_LIMITS.weightMin, reps: PICKER_LIMITS.repsMin },
+  pendingImport: null,
+  pendingImportStats: null
 };
 
 let historyStack = [];
@@ -1124,6 +1135,8 @@ function closeModal(){
   state.tagInputQuery="";
   state.formError=null;
   state.formErrorExerciseId=null;
+  state.pendingImport=null;
+  state.pendingImportStats=null;
   render(); 
 }
 
@@ -2509,6 +2522,7 @@ function renderModal(){
   if(state.modal==='setPicker') return renderSetPickerModal();
   if(state.modal==='dayActions') return renderDayActionsModal();
   if(state.modal==='datepicker') return renderDatePicker();
+  if(state.modal==='importConfirm') return renderImportConfirmModal();
   return '';
 }
 
@@ -3069,32 +3083,279 @@ async function exportData(){
 
 function triggerImport(){ $('#importInput').click(); }
 
+function summarizeLogs(logs){
+  const summary = { days: 0, sets: 0 };
+  if(!logs || typeof logs !== 'object') return summary;
+  for(const entries of Object.values(logs)){
+    if(!Array.isArray(entries)) continue;
+    summary.days++;
+    for(const entry of entries){
+      if(entry && Array.isArray(entry.sets)) summary.sets += entry.sets.length;
+    }
+  }
+  return summary;
+}
+
+async function getCurrentDataStats(){
+  let sets = 0;
+  for(const date of state.logDates){
+    const entries = (await safeGet('log:'+date)) || [];
+    if(!Array.isArray(entries)) continue;
+    for(const entry of entries){
+      if(entry && Array.isArray(entry.sets)) sets += entry.sets.length;
+    }
+  }
+  return {
+    days: state.logDates.length,
+    sets,
+    exercises: state.exercises.length,
+    tags: state.tags.length,
+    routines: state.routines.length
+  };
+}
+
+function validateBackup(data){
+  if(!data || typeof data !== 'object' || Array.isArray(data)) return "Import failed — that file isn't a WorkoutLog backup";
+  if(!data.logs || typeof data.logs !== 'object' || Array.isArray(data.logs)) return "Import failed — this backup has no workout log";
+  if(!Array.isArray(data.exercises) || !Array.isArray(data.tags)) return "Import failed — this backup is missing its workout or tag list";
+  if(data.routines !== undefined && !Array.isArray(data.routines)) return "Import failed — this backup's presets are unreadable";
+  for(const [date, entries] of Object.entries(data.logs)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return `Import failed — unreadable date in backup (${date})`;
+    if(!Array.isArray(entries)) return `Import failed — unreadable entry for ${date}`;
+  }
+  const incoming = summarizeLogs(data.logs);
+  if(incoming.days === 0 && data.exercises.length === 0 && data.tags.length === 0){
+    return "Import failed — this backup is empty, there's nothing to restore";
+  }
+  return null;
+}
+
+async function restoreLogKey(date, previous){
+  if(previous === null || previous === undefined){
+    delete memStorage['log:'+date];
+    try{ localStorage.removeItem(STORAGE_PREFIX + 'log:' + date); }
+    catch(e){ console.warn("Failed to remove log key during rollback", e); }
+  } else {
+    await safeSet('log:'+date, previous);
+  }
+}
+
+async function collectLogKeys(){
+  const prefix = STORAGE_PREFIX + 'log:';
+  const dates = [];
+  for(let index = 0; index < localStorage.length; index++){
+    const key = localStorage.key(index);
+    if(key && key.startsWith(prefix)) dates.push(key.slice(prefix.length));
+  }
+  Object.keys(memStorage).forEach(key => {
+    if(key.startsWith('log:') && !dates.includes(key.slice(4))) dates.push(key.slice(4));
+  });
+  return dates;
+}
+
 async function handleImportFile(file){
+  if(!file) return;
+  let data;
   try{
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if(!data.exercises || !data.tags || !data.logs) throw new Error("bad format");
-    
-    state.exercises = data.exercises || [];
-    state.tags = data.tags || [];
-    state.routines = data.routines || [];
-    state.logDates = data.logDates || Object.keys(data.logs);
-    
+    data = JSON.parse(await file.text());
+  }catch(e){
+    showToast("Import failed — that file isn't valid JSON", false);
+    return;
+  }
+
+  const problem = validateBackup(data);
+  if(problem){ showToast(problem, false); return; }
+
+  const logs = {};
+  for(const [date, entries] of Object.entries(data.logs)) logs[date] = entries;
+
+  state.pendingImport = {
+    logs,
+    exercises: data.exercises,
+    tags: data.tags,
+    routines: Array.isArray(data.routines) ? data.routines : [],
+    version: typeof data.version === 'string' ? data.version : null,
+    exportedAt: typeof data.exportedAt === 'string' ? data.exportedAt : null,
+    incoming: summarizeLogs(logs)
+  };
+  state.pendingImportStats = await getCurrentDataStats();
+  state.modal = 'importConfirm';
+  render();
+}
+
+function cancelImport(){
+  state.pendingImport = null;
+  state.pendingImportStats = null;
+  state.modal = 'profile';
+  render();
+}
+
+async function applyImport(mode){
+  const pending = state.pendingImport;
+  if(!pending) return;
+  state.pendingImport = null;
+  state.pendingImportStats = null;
+
+  const incomingDates = Object.keys(pending.logs);
+  const finalLogs = {};
+  let skipped = 0;
+
+  if(mode === 'merge'){
+    for(const date of state.logDates){
+      const entries = (await safeGet('log:'+date)) || [];
+      if(Array.isArray(entries) && entries.length) finalLogs[date] = entries;
+    }
+    for(const date of incomingDates){
+      if(Object.prototype.hasOwnProperty.call(finalLogs, date)){ skipped++; continue; }
+      finalLogs[date] = pending.logs[date];
+    }
+  } else {
+    for(const date of incomingDates) finalLogs[date] = pending.logs[date];
+  }
+
+  const finalDates = Object.keys(finalLogs).sort();
+  const keepDates = new Set(finalDates);
+
+  const mergeById = (existing, incoming) => {
+    const merged = existing.slice();
+    const seen = new Set(existing.map(item => item && item.id));
+    for(const item of incoming){
+      if(!item || seen.has(item.id)) continue;
+      merged.push(item);
+      seen.add(item.id);
+    }
+    return merged;
+  };
+
+  const previousMeta = {
+    exercises: state.exercises,
+    tags: state.tags,
+    routines: state.routines,
+    logDates: state.logDates
+  };
+
+  if(mode === 'merge'){
+    state.exercises = mergeById(state.exercises, pending.exercises);
+    state.tags = mergeById(state.tags, pending.tags);
+    state.routines = mergeById(state.routines, pending.routines);
+  } else {
+    state.exercises = pending.exercises.slice();
+    state.tags = pending.tags.slice();
+    state.routines = pending.routines.slice();
+  }
+  state.logDates = finalDates;
+
+  // Snapshot every log key we are about to touch so a storage failure can be rolled back.
+  const staleDates = (await collectLogKeys()).filter(date => !keepDates.has(date));
+  const snapshot = {};
+  for(const date of new Set([...staleDates, ...finalDates])){
+    snapshot[date] = await safeGet('log:'+date);
+  }
+
+  async function rollback(){
+    for(const [date, previous] of Object.entries(snapshot)) await restoreLogKey(date, previous);
+    state.exercises = previousMeta.exercises;
+    state.tags = previousMeta.tags;
+    state.routines = previousMeta.routines;
+    state.logDates = previousMeta.logDates;
     await safeSet('exercises', state.exercises);
     await safeSet('tags', state.tags);
     await safeSet('routines', state.routines);
     await safeSet('logDates', state.logDates);
-    
-    for(const [date, entries] of Object.entries(data.logs)){
-      await safeSet('log:'+date, entries);
-    }
-    
     await loadLogForDate(state.currentDate);
-    showToast("Full application restored successfully!", false);
     render();
-  }catch(e){
-    showToast("Import failed — invalid backup file", false);
   }
+
+  // Drop stale days first so their space is available for the incoming ones.
+  for(const date of staleDates) await restoreLogKey(date, null);
+
+  // Write the logs, rolling everything back if the device runs out of space part-way through.
+  for(const date of finalDates){
+    if(!await safeSet('log:'+date, finalLogs[date])){
+      await rollback();
+      showToast("Import cancelled — this device ran out of storage. Your data is unchanged", false);
+      return;
+    }
+  }
+
+  if(!await safeSet('exercises', state.exercises) ||
+     !await safeSet('tags', state.tags) ||
+     !await safeSet('routines', state.routines) ||
+     !await safeSet('logDates', state.logDates)){
+    await rollback();
+    showToast("Import cancelled — this device ran out of storage. Your data is unchanged", false);
+    return;
+  }
+
+  // Never leave log keys behind for days that are no longer in the dataset.
+  const removedDays = staleDates.length;
+  await sweepOrphanLogKeys(keepDates);
+  await loadLogForDate(state.currentDate);
+  render();
+
+  const previousDates = new Set(previousMeta.logDates);
+  const addedDates = mode === 'merge' ? finalDates.filter(date => !previousDates.has(date)) : incomingDates;
+  let addedSets = 0;
+  for(const date of addedDates) addedSets += summarizeLogs({ [date]: finalLogs[date] }).sets;
+
+  const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  let message = mode === 'merge'
+    ? `Merged ${plural(addedDates.length, 'new day')} (${plural(addedSets, 'set')})`
+    : `Restored ${plural(incomingDates.length, 'day')} (${plural(addedSets, 'set')})`;
+  if(mode === 'merge' && skipped) message += `, skipped ${skipped} you already had`;
+  if(removedDays) message += `. Removed ${plural(removedDays, 'old day')}`;
+  showToast(message, false);
+}
+
+async function sweepOrphanLogKeys(keepDates){
+  const prefix = STORAGE_PREFIX + 'log:';
+  const stale = [];
+  for(let index = 0; index < localStorage.length; index++){
+    const key = localStorage.key(index);
+    if(key && key.startsWith(prefix) && !keepDates.has(key.slice(prefix.length))) stale.push(key);
+  }
+  stale.forEach(key => localStorage.removeItem(key));
+  Object.keys(memStorage).forEach(key => {
+    if(key.startsWith('log:') && !keepDates.has(key.slice(4))) delete memStorage[key];
+  });
+  return stale.length;
+}
+
+function renderImportConfirmModal(){
+  const pending = state.pendingImport;
+  if(!pending) return '';
+  const current = state.pendingImportStats || { days: 0, sets: 0, exercises: 0, tags: 0, routines: 0 };
+  const incoming = pending.incoming;
+  const overlap = Object.keys(pending.logs).filter(date => state.logDates.includes(date)).length;
+  const exportedLine = pending.exportedAt
+    ? `Backup taken on ${escapeHtml(pending.exportedAt.slice(0, 10))}.`
+    : 'This backup has no date stamp.';
+  return `
+    <div class="modal-overlay import-confirm-overlay" onclick="if(event.target===this) cancelImport()">
+      <div class="modal import-confirm-modal">
+        <h2>Restore from backup?</h2>
+        <div class="import-confirm-body">
+          <table class="import-compare">
+            <thead><tr><th></th><th>This device</th><th>Backup</th></tr></thead>
+            <tbody>
+              <tr><td>Logged days</td><td>${current.days}</td><td>${incoming.days}</td></tr>
+              <tr><td>Sets</td><td>${current.sets}</td><td>${incoming.sets}</td></tr>
+              <tr><td>Workouts</td><td>${current.exercises}</td><td>${pending.exercises.length}</td></tr>
+              <tr><td>Tags</td><td>${current.tags}</td><td>${pending.tags.length}</td></tr>
+              <tr><td>Presets</td><td>${current.routines}</td><td>${pending.routines.length}</td></tr>
+            </tbody>
+          </table>
+          <p style="margin:0 0 14px;">${exportedLine}</p>
+          <p style="margin:0 0 14px;"><strong>Merge</strong> keeps everything already on this device and only adds the days you don't have${overlap ? ` — ${overlap} overlapping day${overlap === 1 ? '' : 's'} will be skipped` : ''}.</p>
+          <p style="margin:0 0 16px;"><strong>Replace</strong> wipes this device and restores the backup exactly. This can't be undone.</p>
+        </div>
+        <div class="footer-actions import-confirm-actions">
+          <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="applyImport('merge')">Merge into my data</button>
+          <button class="btn btn-danger" style="width:100%; justify-content:center;" onclick="applyImport('replace')">Replace everything</button>
+          <button class="btn" style="width:100%; justify-content:center;" onclick="cancelImport()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

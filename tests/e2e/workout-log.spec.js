@@ -104,3 +104,152 @@ test("profile panel opens with its options", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Presets" })).toBeVisible();
   await expect(page.getByText("Source")).toBeVisible();
 });
+
+// ---- Import ---------------------------------------------------------------
+
+const LOG_KEY_PREFIX = "workoutlog:log:";
+
+async function storedLogKeys(page) {
+  return page.evaluate((prefix) => {
+    return Object.keys(localStorage)
+      .filter((key) => key.startsWith(prefix))
+      .sort();
+  }, LOG_KEY_PREFIX);
+}
+
+function backupFile({
+  logs,
+  exercises = [],
+  tags = [],
+  exportedAt = "2026-01-05T10:00:00.000Z",
+}) {
+  return {
+    name: "workout-app-log.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        exportedAt,
+        version: "2.0",
+        exercises,
+        tags,
+        routines: [],
+        logDates: Object.keys(logs),
+        logs,
+      }),
+    ),
+  };
+}
+
+async function openImport(page, payload) {
+  await page.getByRole("button", { name: "Profile" }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.setInputFiles("#importInput", backupFile(payload));
+  await expect(
+    page.getByRole("heading", { name: "Restore from backup?" }),
+  ).toBeVisible();
+}
+
+test("cancelling an import leaves existing data untouched", async ({
+  page,
+}) => {
+  await openApp(page);
+  await logSet(page, { weight: 90, reps: 8 });
+  const before = await storedLogKeys(page);
+  expect(before).toHaveLength(1);
+
+  await openImport(page, {
+    logs: {
+      "2026-04-01": [
+        {
+          id: "e-1",
+          exerciseId: "other",
+          sets: [{ id: "s-1", weight: 45, reps: 12 }],
+        },
+      ],
+    },
+  });
+  await page.getByRole("button", { name: "Cancel" }).click();
+
+  expect(await storedLogKeys(page)).toEqual(before);
+  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".set-pill").first()).toHaveText("90 lb × 8");
+});
+
+test("an empty backup is rejected instead of wiping data", async ({ page }) => {
+  await openApp(page);
+  await logSet(page, { weight: 90, reps: 8 });
+
+  await page.getByRole("button", { name: "Profile" }).click();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.setInputFiles("#importInput", backupFile({ logs: {} }));
+
+  await expect(page.locator(".toast")).toContainText("nothing to restore");
+  await expect(
+    page.getByRole("heading", { name: "Restore from backup?" }),
+  ).toHaveCount(0);
+  expect(await storedLogKeys(page)).toHaveLength(1);
+});
+
+test("importing a backup merges only the days that are missing", async ({
+  page,
+}) => {
+  await openApp(page);
+  await logSet(page, { weight: 90, reps: 8 });
+  const existingKey = (await storedLogKeys(page))[0];
+  const existingDate = existingKey.replace(LOG_KEY_PREFIX, "");
+
+  await openImport(page, {
+    logs: {
+      [existingDate]: [
+        {
+          id: "dup",
+          exerciseId: "other",
+          sets: [{ id: "s-9", weight: 10, reps: 3 }],
+        },
+      ],
+      "2026-03-03": [
+        {
+          id: "e-1",
+          exerciseId: "other",
+          sets: [{ id: "s-1", weight: 135, reps: 5 }],
+        },
+      ],
+    },
+  });
+  await page.getByRole("button", { name: "Merge into my data" }).click();
+
+  await expect(page.locator(".toast")).toContainText(
+    "skipped 1 you already had",
+  );
+  expect(await storedLogKeys(page)).toEqual(
+    [existingKey, `${LOG_KEY_PREFIX}2026-03-03`].sort(),
+  );
+  await expect(page.locator(".set-pill").first()).toHaveText("90 lb × 8");
+});
+
+test("replacing with a smaller backup sweeps orphaned days", async ({
+  page,
+}) => {
+  await openApp(page);
+  await logSet(page, { weight: 90, reps: 8 });
+  expect(await storedLogKeys(page)).toHaveLength(1);
+
+  await openImport(page, {
+    logs: {
+      "2026-02-01": [
+        {
+          id: "e-1",
+          exerciseId: "other",
+          sets: [{ id: "s-1", weight: 135, reps: 5 }],
+        },
+      ],
+    },
+  });
+  await page.getByRole("button", { name: "Replace everything" }).click();
+
+  await expect(page.locator(".toast")).toContainText("Restored 1 day (1 set)");
+  expect(await storedLogKeys(page)).toEqual([`${LOG_KEY_PREFIX}2026-02-01`]);
+  await expect(page.locator("#log-list")).toContainText(
+    "No workouts logged for this day.",
+  );
+});
