@@ -35,10 +35,33 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Read the exact Playwright version from the lockfile so the cache key
+      # changes whenever Playwright (and therefore the browser build) changes.
+      - name: Read Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      # Caching ~/.cache/ms-playwright avoids re-downloading the ~170MB Chromium
+      # build on every run. This step used to take 17-104s; a cache hit makes it
+      # near-instant.
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
       # Both Playwright projects (mobile "Pixel 5" + "Desktop Chrome") use
       # Chromium, so installing just that browser is enough and much faster.
       - name: Install Playwright browser
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      # OS libraries are not part of the cache, so make sure they are present
+      # even when the browser binaries came from cache.
+      - name: Install Playwright system dependencies
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       - name: Run tests
         run: npm test
