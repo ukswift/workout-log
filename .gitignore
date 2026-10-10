@@ -28,6 +28,11 @@ build/
 # Logs
 *.log
 
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
 # Local backup/export files you might drop in the folder while testing
 *.backup.html
 exercise-app-log-*.json
