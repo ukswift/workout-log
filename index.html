@@ -508,7 +508,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.26";
+const APP_VERSION = "1.0.27";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -2417,21 +2417,26 @@ function getWheelItemHeight(wheel){
 }
 
 function updatePickerValue(kind, scrollTop){
-  const limits = state.settings.pickerLimits;
   const wheel = $('#setPicker' + kind[0].toUpperCase() + kind.slice(1));
-  const index = Math.round(scrollTop / getWheelItemHeight(wheel));
-  state.pickerSelection[kind] = kind === 'weight'
-    ? Number((limits.weightMin + index * limits.weightStep).toFixed(2))
-    : limits.repsMin + index * limits.repsStep;
+  const values = (state.pickerWheelValues && state.pickerWheelValues[kind]) || [];
+  if(!values.length) return;
+  const index = Math.max(0, Math.min(values.length - 1, Math.round(scrollTop / getWheelItemHeight(wheel))));
+  state.pickerSelection[kind] = values[index];
 }
 
 function initSetPickerWheels(weight, reps){
   state.pickerSelection = { weight, reps };
-  const limits = state.settings.pickerLimits;
   const weightWheel = $('#setPickerWeight');
   const repsWheel = $('#setPickerReps');
-  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * getWheelItemHeight(weightWheel);
-  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * getWheelItemHeight(repsWheel);
+  const values = state.pickerWheelValues || { weight: [], reps: [] };
+  if(weightWheel){
+    const index = values.weight.findIndex(value => Math.abs(value - weight) < 1e-9);
+    weightWheel.scrollTop = (index >= 0 ? index : 0) * getWheelItemHeight(weightWheel);
+  }
+  if(repsWheel){
+    const index = values.reps.indexOf(reps);
+    repsWheel.scrollTop = (index >= 0 ? index : 0) * getWheelItemHeight(repsWheel);
+  }
 }
 
 async function cancelSetPicker(){
@@ -2630,6 +2635,34 @@ function renderSettingsModal(){
   `;
 }
 
+function buildWheelValues(limits, kind, current){
+  const min = kind === 'weight' ? limits.weightMin : limits.repsMin;
+  const max = kind === 'weight' ? limits.weightMax : limits.repsMax;
+  const step = kind === 'weight' ? limits.weightStep : limits.repsStep;
+  const values = [];
+  if(kind === 'weight'){
+    for(let value = min; value <= max + step / 100; value += step) values.push(Number(value.toFixed(2)));
+  } else {
+    for(let value = min; value <= max; value += step) values.push(value);
+  }
+  const numeric = Number(current);
+  if(current !== '' && current !== null && current !== undefined && Number.isFinite(numeric) && numeric > 0){
+    const alreadyListed = values.some(value => Math.abs(value - numeric) < 1e-9);
+    if(!alreadyListed){
+      values.push(kind === 'weight' ? Number(numeric.toFixed(2)) : numeric);
+      values.sort((a, b) => a - b);
+    }
+  }
+  return values;
+}
+
+function storedPickerValue(set, field){
+  const raw = set ? set[field] : '';
+  const numeric = Number(raw);
+  if(raw === '' || raw === null || raw === undefined || !Number.isFinite(numeric) || numeric <= 0) return null;
+  return numeric;
+}
+
 function renderSetPickerModal(){
   const limits = state.settings.pickerLimits;
   const edit = state.editingSet;
@@ -2637,14 +2670,14 @@ function renderSetPickerModal(){
   const exerciseId = entry ? entry.exerciseId : (state.currentLog[0] && state.currentLog[0].exerciseId) || null;
   const set = entry && entry.sets.find(s => s.id === edit.setId);
   const previousSession = state.pickerPreviousSession;
-  const weights = [];
-  for(let value = limits.weightMin; value <= limits.weightMax + limits.weightStep / 100; value += limits.weightStep) weights.push(Number(value.toFixed(2)));
-  const reps = [];
-  for(let value = limits.repsMin; value <= limits.repsMax; value += limits.repsStep) reps.push(value);
-  const rawWeight = Math.min(limits.weightMax, Math.max(limits.weightMin, set && set.weight !== '' ? set.weight : limits.weightMin));
-  const rawReps = Math.min(limits.repsMax, Math.max(limits.repsMin, set && set.reps !== '' ? set.reps : limits.repsMin));
-  const selectedWeight = Number((limits.weightMin + Math.round((rawWeight - limits.weightMin) / limits.weightStep) * limits.weightStep).toFixed(2));
-  const selectedReps = limits.repsMin + Math.round((rawReps - limits.repsMin) / limits.repsStep) * limits.repsStep;
+  const storedWeight = storedPickerValue(set, 'weight');
+  const storedReps = storedPickerValue(set, 'reps');
+  const weights = buildWheelValues(limits, 'weight', storedWeight);
+  const reps = buildWheelValues(limits, 'reps', storedReps);
+  const selectedWeight = storedWeight !== null ? storedWeight : limits.weightMin;
+  const selectedReps = storedReps !== null ? storedReps : limits.repsMin;
+  state.pickerWheelValues = { weight: weights, reps };
+  state.pickerSelection = { weight: selectedWeight, reps: selectedReps };
   setTimeout(() => initSetPickerWheels(selectedWeight, selectedReps), 0);
   return `
     <div class="modal-overlay set-picker-overlay" onclick="if(event.target===this) cancelSetPicker()">
