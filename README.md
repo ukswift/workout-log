@@ -68,11 +68,12 @@ Avoid prioritizing cloud sync, social features, leaderboards, voice input, or pr
 
 ### Technical Improvements
 
+- [ ] **CI for End-to-End Tests** — Add a GitHub Actions workflow that installs Playwright and runs `npm test` on every push and pull request to `main`, uploading the HTML report and traces as build artifacts on failure
 - [ ] **PWA Installation** — Improve install experience on all platforms
 - [ ] **Offline Sync Queue** — Queue actions when offline, sync when online
 - [ ] **Performance** — Optimize rendering for 100+ exercises
 - [ ] **Accessibility** — Improve WCAG compliance
-- [ ] **Unit Tests** — Add comprehensive test suite
+- [ ] **Unit Tests** — Add comprehensive test suite (Playwright e2e UX tests already exist in `tests/e2e/`)
 
 ## Deploying to GitHub Pages
 
@@ -117,7 +118,7 @@ Before each commit, the hook creates the next patch version and stages the synch
 
 The version displays in the app under **Profile → About → Version**.
 
-### Current version: 1.0.28
+### Current version: 1.0.29
 
 ## Local development
 
