@@ -508,7 +508,7 @@
 
 <script>
 // ============ CONFIG & CONSTANTS ============
-const APP_VERSION = "1.0.25";
+const APP_VERSION = "1.0.26";
 
 const PICKER_LIMITS = {
   weightMin: 5,
@@ -2412,9 +2412,14 @@ async function saveSetPicker(){
   render();
 }
 
+function getWheelItemHeight(wheel){
+  return wheel && wheel.querySelector('.wheel-option')?.getBoundingClientRect().height || UI_CONSTANTS.wheelItemHeightPx;
+}
+
 function updatePickerValue(kind, scrollTop){
   const limits = state.settings.pickerLimits;
-  const index = Math.round(scrollTop / UI_CONSTANTS.wheelItemHeightPx);
+  const wheel = $('#setPicker' + kind[0].toUpperCase() + kind.slice(1));
+  const index = Math.round(scrollTop / getWheelItemHeight(wheel));
   state.pickerSelection[kind] = kind === 'weight'
     ? Number((limits.weightMin + index * limits.weightStep).toFixed(2))
     : limits.repsMin + index * limits.repsStep;
@@ -2425,8 +2430,8 @@ function initSetPickerWheels(weight, reps){
   const limits = state.settings.pickerLimits;
   const weightWheel = $('#setPickerWeight');
   const repsWheel = $('#setPickerReps');
-  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * UI_CONSTANTS.wheelItemHeightPx;
-  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * UI_CONSTANTS.wheelItemHeightPx;
+  if(weightWheel) weightWheel.scrollTop = Math.round((weight - limits.weightMin) / limits.weightStep) * getWheelItemHeight(weightWheel);
+  if(repsWheel) repsWheel.scrollTop = Math.round((reps - limits.repsMin) / limits.repsStep) * getWheelItemHeight(repsWheel);
 }
 
 async function cancelSetPicker(){
